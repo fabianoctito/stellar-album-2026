@@ -13,7 +13,7 @@ How `stellar-album` gets built: in **dependency order**, in **testable pieces**,
 | Phase | Contract(s) | Effort | Branch | Tag | Status |
 |---|---|---|---|---|---|
 | 0 | Scaffolding (workspace, `common`, `test-utils`, CI) | — | — | — | ✅ |
-| 1 | Coin (OZ `fungible`) | Low | `class-1-coin-faucet` | `v0.1-fungible` | ⬜ |
+| 1 | Coin (OZ `fungible`) | Low | `class-1-coin-faucet` | `v0.1-fungible` | ✅ |
 | 2 | Faucet | Low | `class-1-coin-faucet` | `v0.1-fungible` | ⬜ |
 | 3 | Sticker (semi-fungible) | **High** | `class-2-stickers` | `v0.2-semifungible` | ⬜ |
 | 4 | Pack (randomness) | **Highest** | `class-3-packs-album` | `v0.3-collectibles` | ⬜ |
@@ -47,6 +47,10 @@ Status legend: ⬜ todo · 🔵 in progress · ✅ done. **The Status column is 
 - **Authority edges tested:** none yet (minter is a test address).
 - **Exit criteria:** balance/supply/transfer/mint correct; unauthorized mint rejected.
 - **Ships as:** `class-1-coin-faucet` / `v0.1-fungible`.
+
+> **Build notes:** OZ crates pinned at `0.7.2` (`stellar-tokens`). Trait entrypoints are exported with `#[contractimpl(contracttrait)]` (soroban-sdk 26) — the older `#[default_impl]` macro the docs mention is gone in 0.7.x. The transfer default uses `MuxedAddress`, which must be imported into the contract module. Admin/minter are hand-rolled (settable `minter`, admin-gated `set_minter`) so the authority-edge convention is explicit; the OZ `fungible` Base supplies balances/transfer/supply/metadata.
+
+**Status: ✅ done.** Unit gate green: 5 Coin tests, `clippy -D warnings`, `stellar contract build` exports the token entrypoints. The class-1 `reproduce_class_1` integration test lands with Phase 2 (Faucet), which completes the `class-1-coin-faucet` branch.
 
 ### Phase 2 — Faucet (mints Coin, cooldown)
 - **Builds:** Faucet holding the Coin address + parametrizable cooldown (60s class / 3h campaign) + 1000-Coin seed; `claim()` checks per-address last-claim timestamp and cross-calls `Coin::mint`.

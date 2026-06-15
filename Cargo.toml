@@ -10,10 +10,12 @@ repository = "https://github.com/stellar/stellar-album"
 
 [workspace.dependencies]
 soroban-sdk = "26.1.0"
-# OpenZeppelin Soroban token libraries are added in later phases:
-#   - stellar-fungible      → Coin    (Phase 1)
-#   - stellar-non-fungible  → Album   (Phase 6)
+# OpenZeppelin Soroban contract libraries (released in lockstep at 0.7.2).
+#   - stellar-tokens → fungible Base for Coin (Phase 1); non-fungible for Album (Phase 6)
+# Trait default bodies are exported via `#[contractimpl(contracttrait)]` (soroban-sdk 26),
+# so no extra default-impl macro crate is needed.
 # Sticker is a hand-rolled multi-token (no OZ equivalent — see docs/decisions.md D8).
+stellar-tokens = "0.7.2"
 
 # Tuned for small, safe Soroban wasm. overflow-checks ON on purpose: arithmetic
 # bugs in token math should trap, not wrap.
