@@ -25,3 +25,6 @@ mod class_2;
 
 #[cfg(test)]
 mod class_3;
+
+#[cfg(test)]
+mod class_4;

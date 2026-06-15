@@ -19,11 +19,13 @@ How `stellar-album` gets built: in **dependency order**, in **testable pieces**,
 | 4 | Pack (randomness) | **Highest** | `class-3-packs-album` | `v0.3-collectibles` | ✅ |
 | 5 | Store | Med | `class-4-store-escrow` | `v0.4-marketplace` | ✅ |
 | 6 | Album (soulbound) | Med | `class-3-packs-album` | `v0.3-collectibles` | ✅ |
-| 7 | Escrow | **High** | `class-4-store-escrow` | `v0.4-marketplace` | ⬜ |
+| 7 | Escrow | **High** | `class-4-store-escrow` | `v0.4-marketplace` | ✅ |
 
 > **Deliberate non-linearity:** the *build* order (dependency-driven) is 0→7. The *ship* order differs: **Store (Phase 5) ships in `class-4`**, **Album (Phase 6) ships in `class-3`**. Store is built before Album because Album's burn path and Store's mint path both depend on lower contracts, but Album belongs to the Class-3 narrative and Store to Class-4. This is intentional — see [decision D14](decisions.md).
 
 Status legend: ⬜ todo · 🔵 in progress · ✅ done. **The Status column is the single source of truth** — update it in the same PR that lands the phase.
+
+> **✅ All phases complete.** All 7 contracts are built and tested (45 tests), every authority edge has an integration test, and each class's `reproduce_this` is green. `main` holds the full project; tags `v0.1-fungible` … `v0.4-marketplace` mark the class checkpoints. Remaining before a public run: the testnet TTL gate (Hard Rule 2) and the art/consent track (D15).
 
 ---
 
@@ -113,6 +115,10 @@ Status legend: ⬜ todo · 🔵 in progress · ✅ done. **The Status column is 
 - **Authority edges tested:** **Escrow→Sticker** (transfer / custody).
 - **Exit criteria:** all three paths conserve balances; no locked stickers.
 - **Ships as:** `class-4-store-escrow` / `v0.4-marketplace`.
+
+> **Build notes:** Custody = the escrow holds the maker's sticker as its own balance (`transfer` to `current_contract_address`). `accept_offer` uses checks-effects-interactions (remove the offer before moving assets); a taker who can't provide the wanted sticker makes the whole call revert, leaving custody intact (proven by a `try_accept_offer` test). Sticker reached via local `#[contractclient]` (`StickerSwap`).
+
+**Status: ✅ done — Class 4 complete. ALL PHASES DONE.** Gate green: 5 Escrow tests + `reproduce_class_4` (full system: faucet → store → open → trade), `clippy -D warnings`, `stellar contract build`. `class-4-store-escrow` + `v0.4-marketplace` cut here; `main` is the complete project (7 contracts, 45 tests).
 
 ---
 

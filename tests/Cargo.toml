@@ -20,3 +20,5 @@ faucet = { path = "../contracts/faucet" }
 sticker = { path = "../contracts/sticker" }
 pack = { path = "../contracts/pack" }
 album = { path = "../contracts/album" }
+store = { path = "../contracts/store" }
+escrow = { path = "../contracts/escrow" }

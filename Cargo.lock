@@ -660,6 +660,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2bfcf67fea2815c2fc3b90873fae90957be12ff417335dfadc7f52927feb03b2"
 
 [[package]]
+name = "escrow"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "soroban-sdk",
+ "sticker",
+ "test-utils",
+]
+
+[[package]]
 name = "ethnum"
 version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1721,10 +1731,12 @@ dependencies = [
  "album",
  "coin",
  "common",
+ "escrow",
  "faucet",
  "pack",
  "soroban-sdk",
  "sticker",
+ "store",
  "test-utils",
 ]
 

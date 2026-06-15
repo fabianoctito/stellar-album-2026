@@ -1,0 +1,19 @@
+[package]
+name = "escrow"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+common = { path = "../common" }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+test-utils = { path = "../test-utils" }
+# Real Sticker for tests; custody transfers use the local StickerSwap interface.
+sticker = { path = "../sticker" }

@@ -73,4 +73,4 @@ Then follow [`docs/bootstrap-and-deploy.md`](docs/bootstrap-and-deploy.md) and t
 
 ## Status
 
-**Class 3 complete ✅** (through Album — Phases 0–6; tag `v0.3-collectibles`). Store (Phase 5) is built but ships in Class 4. Next: Phase 7 (Escrow) completes Class 4. See [`docs/implementation-plan.md`](docs/implementation-plan.md) for the live phase status and test gates; open questions are tracked at the bottom of [`docs/decisions.md`](docs/decisions.md).
+**✅ Complete — all 7 contracts built and tested** (Classes 1–4; tags `v0.1-fungible` … `v0.4-marketplace`; 45 tests). `main` is the full project. Remaining before a public run: the testnet TTL gate and sticker art/consent. See [`docs/implementation-plan.md`](docs/implementation-plan.md) for phase status; open questions are at the bottom of [`docs/decisions.md`](docs/decisions.md).
