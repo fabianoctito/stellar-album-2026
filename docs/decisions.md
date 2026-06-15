@@ -87,6 +87,24 @@ ADR-style record of the decisions made while designing `stellar-album`, and *why
 
 ---
 
+## D18 — Frontend stack: Vite + React + TypeScript + Tailwind, generated bindings
+**Decision:** The frontend is a client-only Vite + React + TypeScript app, styled with Tailwind. Contract access uses **generated TypeScript bindings** (`stellar contract bindings typescript` per deployed contract) on top of `@stellar/stellar-sdk`.
+**Why:** It's a testnet demo with all reads/writes against RPC — no need for SSR/Next. Generated bindings give a typed client per contract (`pack.open` → `AssembledTransaction<Array<u32>>`), eliminating hand-written XDR/ScVal. See [frontend-and-testnet.md](frontend-and-testnet.md).
+
+## D19 — Wallet: Freighter via Stellar Wallets Kit (passkeys later)
+**Decision:** v1 uses **Freighter** through `@creit.tech/stellar-wallets-kit`. Passkey / smart-account login is deferred.
+**Why:** Path of least resistance for a dev-facing testnet build — one connect step, no infra. Passkeys are a better end-user experience but require a smart-wallet factory + sponsor/relay + recovery handling (a week-plus); they belong to the same future milestone as real fee sponsorship (D20).
+
+## D20 — Fees: friendbot auto-fund now; Launchtube / OZ relay later
+**Decision:** The product intent is "the user never deals with XLM/gas." For v1 (Freighter + testnet) this is met by **auto-funding the connected account via friendbot on connect** — no fee-sponsorship backend. All transaction submission is isolated behind a single `submit(tx)` helper so the submitter can be swapped without touching contract calls.
+**Why:** On testnet a Freighter account is friendbot-funded and pays its own trivial fee; true fee sponsorship (a fee-bump endpoint with a hot sponsor key) would add a keyed backend that buys nothing here. **Real sponsorship — via Launchtube or an OpenZeppelin relayer — is deferred to the mainnet / passkey phase**, where users genuinely start at zero balance and no friendbot exists. The `submit()` indirection makes that swap a contained, few-hours change. Note: classic "sponsored reserves" is account-creation min-balance, not tx fees — not relevant here.
+
+## D21 — v1 frontend scope: the core loop only
+**Decision:** The first testable build is **connect → claim (Faucet) → buy (Store) → open (Pack) → reveal 3 stickers (rarity + type)**. Album paste and Escrow trade UIs are v2. Sticker serial numbers are not shown (stickers are per-type counts, not individually serialized — D16).
+**Why:** That single path already demonstrates the whole fungibility spectrum (fungible Coin spent → fungible Pack → collapses into semi-fungible stickers). The Album and Escrow *contracts* are built and tested, so deferring their *UI* costs nothing on the backend. Done = "on testnet, connect a wallet, claim, buy, open, and see 3 stickers with rarity, in under 2 minutes." Guard against gilding screens before the loop runs on-chain.
+
+---
+
 ## Open questions (not yet decided)
 
 - **Class 3 density.** Pack + Album + the randomness module is a lot for one class. Keep together (strongest hook) or split the re-roll attack into an optional lab?

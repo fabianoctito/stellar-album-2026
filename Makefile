@@ -22,5 +22,9 @@ lint:
 wasm:
 	stellar contract build
 
+# Deploy + wire all 7 contracts on testnet and emit frontend/.env.local.
+bootstrap:
+	./bootstrap.sh
+
 clean:
 	cargo clean

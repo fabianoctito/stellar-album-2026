@@ -11,6 +11,11 @@
 # Soroban test snapshots (auto-generated, regenerated on each test run)
 **/test_snapshots/
 
+# Frontend
+node_modules/
+frontend/dist/
+frontend/.env.local
+
 # OS / editor noise
 .DS_Store
 *.swp

@@ -37,6 +37,7 @@ This table is the spine of the whole course. See [`docs/fungibility-spectrum.md`
 | [`docs/glossary.md`](docs/glossary.md) | Shared vocabulary (fungible, semi-fungible, soulbound, burn, atomic, grindable…). |
 | [`docs/decisions.md`](docs/decisions.md) | Decision log — what was decided and why (ADR-style). |
 | [`docs/implementation-plan.md`](docs/implementation-plan.md) | Phased build plan, test gates, branch/tag scheme, and live status. |
+| [`docs/frontend-and-testnet.md`](docs/frontend-and-testnet.md) | Frontend stack, testnet deploy/bootstrap, fee strategy, and v1 scope. |
 | [`docs/curriculum/`](docs/curriculum/) | The 4-class syllabus, one file per class. |
 
 ---
