@@ -15,6 +15,7 @@
 node_modules/
 frontend/dist/
 frontend/.env.local
+frontend/src/contracts/
 
 # OS / editor noise
 .DS_Store
