@@ -18,3 +18,5 @@ common = { path = "../contracts/common" }
 coin = { path = "../contracts/coin" }
 faucet = { path = "../contracts/faucet" }
 sticker = { path = "../contracts/sticker" }
+pack = { path = "../contracts/pack" }
+album = { path = "../contracts/album" }

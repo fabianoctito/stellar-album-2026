@@ -81,6 +81,12 @@ ADR-style record of the decisions made while designing `stellar-album`, and *why
 
 ---
 
+## D17 — Album is hand-rolled, not OZ `non-fungible`
+**Decision:** Implement the Album as a hand-rolled soulbound, per-owner stateful contract rather than on the OpenZeppelin `non-fungible` Base. Soulbound is enforced by construction — there is **no transfer function**.
+**Why:** OZ `non-fungible` 0.7.2 has no soulbound extension (making it non-transferable means overriding the `contracttrait`-exported `transfer`), and the album's meaningful state is the per-owner slot bitmap, which `non-fungible` doesn't model — it would be hand-rolled regardless. A contract with no transfer entrypoint is the cleanest possible soulbound. (Net: only Coin reuses an OZ token Base; Sticker and Album are hand-rolled — Sticker because no multi-token exists, Album for the reasons here.)
+
+---
+
 ## Open questions (not yet decided)
 
 - **Class 3 density.** Pack + Album + the randomness module is a lot for one class. Keep together (strongest hook) or split the re-roll attack into an optional lab?

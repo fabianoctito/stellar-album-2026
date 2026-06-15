@@ -63,10 +63,13 @@ A holding of sealed packs. Sealed packs are interchangeable, so an owner holds a
 - **Randomness caveat (taught, not hidden):** `env.prng()` is **grindable** — a user can simulate the open transaction, see the outcome, and only submit when the draw is good (a free re-roll). This is acceptable for a testnet demo and is turned into explicit course content (the attack + mitigations). See [Class 3](curriculum/class-3-pack-album.md) and [decisions](decisions.md).
 
 ### Album
-A soulbound NFT — one per person, carrying collection state.
-- Built on OpenZeppelin `non-fungible` Base, with **transfer blocked** (soulbound).
-- `paste(owner, type_id)`: **burns** the sticker (cross-contract call to `Sticker.burn`) and marks the slot filled. **Irreversible** — a pasted sticker can never be traded again.
-- Storage maps the 20 slots to filled/empty state.
+A soulbound, per-owner collection — one per person, carrying slot state.
+- **Hand-rolled**, not OZ `non-fungible` — see [decision D17]. Soulbound by construction: there is **no transfer function**.
+- `open_album(owner)` mints the (empty) album; one per person.
+- `paste(owner, type_id)`: **burns** the sticker (cross-contract call to `Sticker.burn`, of which the Album is the burner) and marks the slot filled. **Irreversible** — a pasted sticker can never be traded again.
+- Storage tracks album existence, per-`(owner, type)` filled slots, and a filled count.
+
+[decision D17]: decisions.md
 
 ### Store
 - `buy_pack(buyer)`: pulls Coin from the buyer (pack price = 100 Coin) and **mints a Pack** to them.

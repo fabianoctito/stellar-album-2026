@@ -15,6 +15,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "album"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "soroban-sdk",
+ "sticker",
+ "test-utils",
+]
+
+[[package]]
 name = "allocator-api2"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1708,9 +1718,11 @@ dependencies = [
 name = "tests"
 version = "0.0.0"
 dependencies = [
+ "album",
  "coin",
  "common",
  "faucet",
+ "pack",
  "soroban-sdk",
  "sticker",
  "test-utils",

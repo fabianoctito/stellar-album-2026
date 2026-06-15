@@ -18,7 +18,7 @@ How `stellar-album` gets built: in **dependency order**, in **testable pieces**,
 | 3 | Sticker (semi-fungible) | **High** | `class-2-stickers` | `v0.2-semifungible` | ✅ |
 | 4 | Pack (randomness) | **Highest** | `class-3-packs-album` | `v0.3-collectibles` | ✅ |
 | 5 | Store | Med | `class-4-store-escrow` | `v0.4-marketplace` | ✅ |
-| 6 | Album (soulbound) | Med | `class-3-packs-album` | `v0.3-collectibles` | ⬜ |
+| 6 | Album (soulbound) | Med | `class-3-packs-album` | `v0.3-collectibles` | ✅ |
 | 7 | Escrow | **High** | `class-4-store-escrow` | `v0.4-marketplace` | ⬜ |
 
 > **Deliberate non-linearity:** the *build* order (dependency-driven) is 0→7. The *ship* order differs: **Store (Phase 5) ships in `class-4`**, **Album (Phase 6) ships in `class-3`**. Store is built before Album because Album's burn path and Store's mint path both depend on lower contracts, but Album belongs to the Class-3 narrative and Store to Class-4. This is intentional — see [decision D14](decisions.md).
@@ -102,6 +102,10 @@ Status legend: ⬜ todo · 🔵 in progress · ✅ done. **The Status column is 
 - **Authority edges tested:** **Album→Sticker** (burn).
 - **Exit criteria:** soulbound enforced; paste semantics correct.
 - **Ships as:** `class-3-packs-album` / `v0.3-collectibles`.
+
+> **Build notes:** Hand-rolled, not OZ `non-fungible` (decision D17) — OZ has no soulbound extension and the album's substance is its per-owner slot state, which OZ doesn't model. Soulbound is enforced by construction: there is **no transfer function**. `open_album` mints the (empty) album; `paste` burns the sticker (Album→Sticker burn edge) and fills the slot, irreversibly. Burn via local `#[contractclient]` (`StickerBurn`).
+
+**Status: ✅ done — Class 3 complete.** Gate green: 7 Album tests + `reproduce_class_3` (mint pack directly → open → paste, no Store per D14), `clippy -D warnings`, `stellar contract build`. `class-3-packs-album` + `v0.3-collectibles` cut here.
 
 ### Phase 7 — Escrow (sticker↔sticker custody) — HIGH EFFORT
 - **Builds:** `create_offer` (takes maker's sticker into custody), `accept_offer` (atomic swap), `cancel_offer` (returns custody). Checks-effects-interactions on accept.
