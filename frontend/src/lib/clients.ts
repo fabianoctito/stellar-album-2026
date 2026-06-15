@@ -8,6 +8,8 @@ import { Client as Faucet } from "../contracts/faucet/src/index.ts";
 import { Client as Store } from "../contracts/store/src/index.ts";
 import { Client as Pack } from "../contracts/pack/src/index.ts";
 import { Client as Sticker } from "../contracts/sticker/src/index.ts";
+import { Client as Album } from "../contracts/album/src/index.ts";
+import { Client as Escrow } from "../contracts/escrow/src/index.ts";
 import { CONTRACTS, NETWORK_PASSPHRASE, RPC_URL } from "./network";
 import { signTransaction } from "./wallet";
 
@@ -29,5 +31,7 @@ export function makeClients(publicKey?: string) {
     store: new Store(base(CONTRACTS.store, publicKey)),
     pack: new Pack(base(CONTRACTS.pack, publicKey)),
     sticker: new Sticker(base(CONTRACTS.sticker, publicKey)),
+    album: new Album(base(CONTRACTS.album, publicKey)),
+    escrow: new Escrow(base(CONTRACTS.escrow, publicKey)),
   };
 }

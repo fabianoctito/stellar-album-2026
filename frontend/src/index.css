@@ -1,1 +1,13 @@
 @import "tailwindcss";
+
+/* Pack-open reveal: cards flip + pop in, staggered (see App.tsx animationDelay). */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: rotateY(90deg) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
