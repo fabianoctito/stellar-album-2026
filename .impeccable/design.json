@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-15T00:00:00Z",
+  "title": "Design System: Stellar Album",
+  "extensions": {
+    "colorMeta": {
+      "leaf": { "role": "primary", "displayName": "Leaf Green", "canonical": "oklch(0.58 0.15 150)", "tonalRamp": ["oklch(0.25 0.08 150)", "oklch(0.33 0.10 150)", "oklch(0.41 0.12 150)", "oklch(0.50 0.14 150)", "oklch(0.58 0.15 150)", "oklch(0.70 0.12 150)", "oklch(0.82 0.08 150)", "oklch(0.93 0.05 150)"] },
+      "leaf-deep": { "role": "primary", "displayName": "Deep Leaf", "canonical": "oklch(0.45 0.13 152)" },
+      "rare": { "role": "secondary", "displayName": "Rare Blue", "canonical": "oklch(0.52 0.13 240)", "tonalRamp": ["oklch(0.28 0.07 240)", "oklch(0.36 0.09 240)", "oklch(0.44 0.11 240)", "oklch(0.52 0.13 240)", "oklch(0.62 0.12 240)", "oklch(0.74 0.09 240)", "oklch(0.85 0.06 240)", "oklch(0.93 0.04 240)"] },
+      "gold": { "role": "secondary", "displayName": "Foil Gold", "canonical": "oklch(0.72 0.13 85)", "tonalRamp": ["oklch(0.30 0.06 85)", "oklch(0.40 0.08 85)", "oklch(0.50 0.10 85)", "oklch(0.61 0.12 85)", "oklch(0.72 0.13 85)", "oklch(0.82 0.11 85)", "oklch(0.90 0.07 85)", "oklch(0.96 0.03 85)"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "oklch(0.27 0.02 150)", "tonalRamp": ["oklch(0.20 0.02 150)", "oklch(0.27 0.02 150)", "oklch(0.40 0.02 150)", "oklch(0.52 0.022 150)", "oklch(0.70 0.02 150)", "oklch(0.86 0.03 150)", "oklch(0.945 0.018 150)", "oklch(0.985 0.008 150)"] },
+      "paper": { "role": "neutral", "displayName": "Paper", "canonical": "oklch(0.975 0.008 95)" },
+      "cream": { "role": "neutral", "displayName": "Cream", "canonical": "oklch(0.945 0.018 92)" },
+      "kraft": { "role": "neutral", "displayName": "Kraft", "canonical": "oklch(0.9 0.032 84)" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Bricolage Grotesque. Page titles, wordmark, reveal headline." },
+      "title": { "displayName": "Title", "purpose": "Bricolage Grotesque. Section heads, hero names, the green CTA." },
+      "body": { "displayName": "Body", "purpose": "Inter. Teaching copy, 65 to 75ch." },
+      "label": { "displayName": "Label", "purpose": "Inter, often uppercase. Tier names, counters, field labels." }
+    },
+    "shadows": [
+      { "name": "debossed-pocket", "value": "inset 0 3px 12px oklch(0.5 0.02 150 / 0.12)", "purpose": "Empty album slots; pressed into the page." },
+      { "name": "lifted-control", "value": "0 4px 6px -1px oklch(0.27 0.02 150 / 0.1)", "purpose": "Primary buttons, filled stickers, nav arrows." },
+      { "name": "book", "value": "0 20px 40px -12px oklch(0.27 0.02 150 / 0.2)", "purpose": "The album cover and the connect-screen pack." }
+    ],
+    "motion": [
+      { "name": "ease-out-quint", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "All transitions and entrances; exponential ease-out, no bounce." },
+      { "name": "state", "value": "180ms", "purpose": "Color and transform state changes on controls." },
+      { "name": "reveal", "value": "550ms", "purpose": "Pack reveal card flips and the album page turn." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one loud action on a screen: rip a pack, connect, start album.",
+      "html": "<button class=\"ds-btn-primary\">Rip a pack</button>",
+      "css": ".ds-btn-primary{background:var(--color-leaf-deep);color:var(--color-paper);font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:1.125rem;padding:1rem 1.5rem;border:none;border-radius:.75rem;box-shadow:0 4px 6px -1px oklch(0.27 0.02 150 / 0.1);cursor:pointer;transition:background .18s,transform .18s}.ds-btn-primary:hover{background:var(--color-leaf);transform:translateY(-1px)}.ds-btn-primary:focus-visible{outline:2px solid var(--color-leaf);outline-offset:2px}"
+    },
+    {
+      "name": "Counter Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Quiet secondary action (claim, buy) that sits beside the hero without competing.",
+      "html": "<button class=\"ds-btn-secondary\"><span class=\"t\">Claim coins</span><span class=\"s\">free from the faucet</span></button>",
+      "css": ".ds-btn-secondary{display:flex;flex-direction:column;align-items:flex-start;gap:.125rem;background:var(--color-paper);color:var(--color-ink);border:none;border-radius:.75rem;padding:.75rem 1rem;box-shadow:inset 0 0 0 1px var(--color-edge);text-align:left;cursor:pointer;transition:box-shadow .18s}.ds-btn-secondary:hover{box-shadow:inset 0 0 0 1px var(--color-leaf)}.ds-btn-secondary .t{font-family:'Bricolage Grotesque',sans-serif;font-weight:700}.ds-btn-secondary .s{font-size:.75rem;color:var(--color-ink-soft)}"
+    },
+    {
+      "name": "Nav Pill (active)",
+      "kind": "nav",
+      "refersTo": "nav-pill-active",
+      "description": "Top-bar route tab; active state.",
+      "html": "<button class=\"ds-nav-pill\">Album</button>",
+      "css": ".ds-nav-pill{font-family:Inter,sans-serif;font-weight:600;font-size:.875rem;padding:.375rem .875rem;border:none;border-radius:9999px;background:var(--color-leaf-deep);color:var(--color-paper);cursor:pointer}"
+    },
+    {
+      "name": "Coin Pill",
+      "kind": "chip",
+      "refersTo": "coin-pill",
+      "description": "The fungible balance, shown as a quantity in a brand tint.",
+      "html": "<span class=\"ds-coin\">1000 ⭐</span>",
+      "css": ".ds-coin{display:inline-flex;align-items:center;gap:.25rem;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;background:var(--color-leaf-tint);color:var(--color-leaf-deep);padding:.25rem .75rem;border-radius:9999px}"
+    },
+    {
+      "name": "Sticker (common)",
+      "kind": "card",
+      "refersTo": "sticker-card",
+      "description": "The collectible: a faced 3:4 card with name, rarity tier, and glyph.",
+      "html": "<div class=\"ds-sticker\"><div class=\"face\">🧑‍🚀</div><div class=\"name\">SDF #3</div><div class=\"tier\">● Common</div></div>",
+      "css": ".ds-sticker{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;width:120px;aspect-ratio:3/4;background:var(--color-cream);box-shadow:inset 0 0 0 1px var(--color-edge);border-radius:1rem}.ds-sticker .face{font-size:2rem}.ds-sticker .name{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.75rem;color:var(--color-ink);margin-top:.25rem}.ds-sticker .tier{font-size:.625rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--color-ink-soft)}"
+    },
+    {
+      "name": "Sticker (legendary, foil)",
+      "kind": "card",
+      "refersTo": "sticker-card",
+      "description": "The legendary rarity treatment: foil-gold face under a moving holographic sheen.",
+      "html": "<div class=\"ds-sticker-leg\"><div class=\"face\">🧑‍🚀</div><div class=\"name\">SDF #18</div><div class=\"tier\">✦ Legendary</div></div>",
+      "css": ".ds-sticker-leg{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;width:120px;aspect-ratio:3/4;background:oklch(0.72 0.13 85 / 0.2);box-shadow:inset 0 0 0 1px oklch(0.72 0.13 85 / 0.7);border-radius:1rem}.ds-sticker-leg .face{position:relative;z-index:1;font-size:2rem}.ds-sticker-leg .name{position:relative;z-index:1;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.75rem;color:var(--color-ink);margin-top:.25rem}.ds-sticker-leg .tier{position:relative;z-index:1;font-size:.625rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--color-ink)}.ds-sticker-leg::after{content:'';position:absolute;inset:0;background:linear-gradient(115deg,transparent 34%,oklch(0.95 0.06 200 / 0.55) 46%,oklch(0.95 0.06 320 / 0.55) 54%,transparent 66%);background-size:250% 100%;animation:ds-sheen 4.5s ease-in-out infinite}@keyframes ds-sheen{0%{background-position:130% 0}100%{background-position:-30% 0}}"
+    },
+    {
+      "name": "Empty Album Pocket",
+      "kind": "custom",
+      "refersTo": "sticker-card",
+      "description": "An unfilled album slot, debossed into the leaf and waiting.",
+      "html": "<div class=\"ds-pocket\">#7</div>",
+      "css": ".ds-pocket{display:flex;align-items:center;justify-content:center;width:84px;aspect-ratio:3/4;border:1px dashed var(--color-edge);border-radius:.75rem;color:oklch(0.52 0.022 150 / 0.4);font-size:.75rem;box-shadow:inset 0 2px 7px oklch(0.5 0.02 150 / 0.1)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Schoolyard Sticker Book",
+    "overview": "The Panini album you filled at recess, rebuilt for the browser: warm paper, a forest-green cover, foil on the rare ones, and the thrill of pressing a sticker into its slot. Light theme because the scene is a bright desk, not a trading terminal. Everything is tactile. The audience is developers, so the craft is real, but the feeling is play; the interface teaches the fungibility spectrum by contrast, not by label. A coin reads as a quantity, a sticker as an object with a face and rarity, the album as the one unique thing you own.",
+    "keyCharacteristics": [
+      "Warm paper light theme, every neutral tinted toward the green brand hue.",
+      "One committed accent (forest leaf-green) plus a deliberate three-tier rarity palette.",
+      "Chunky grotesque display voice over a quiet, dependable sans for functional UI.",
+      "Tactile depth: things press in, lift, and stamp; motion is bold at the moments that matter."
+    ],
+    "rules": [
+      { "name": "The Three Kinds Rule", "body": "A coin, a sticker, and the album must never read as the same kind of element. The visual gap between them is the lesson.", "section": "colors" },
+      { "name": "The Rarity-Is-Data Rule", "body": "Rare blue and foil gold belong to stickers only. Never spent on buttons, chrome, or decoration.", "section": "colors" },
+      { "name": "The Quiet-Controls Rule", "body": "Display type is for wordmark, titles, and celebrations. Buttons, inputs, data, and labels stay Inter.", "section": "typography" },
+      { "name": "The Pressed-Paper Rule", "body": "Empty equals pressed in (inset shadow). Earned or actionable equals lifted out (drop shadow). Flat with neither is unfinished.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep the coin a quantity, the sticker an object, the album the one unique thing.",
+      "Do tint every neutral toward the green brand hue; never pure black or white.",
+      "Do reserve Rare Blue and Foil Gold for stickers only.",
+      "Do press empty things in and lift earned things out.",
+      "Do spend the bold motion budget on the pack rip, the stick, a legendary pull, a completed page; respect prefers-reduced-motion.",
+      "Do keep functional UI in Inter; let Bricolage carry personality in titles and celebrations."
+    ],
+    "donts": [
+      "Don't drift toward generic web3: no neon on black, no glow, no glassmorphism.",
+      "Don't build a corporate SaaS dashboard: no identical card grids, no hero-metric tiles, no purple gradients.",
+      "Don't tip into childish: no Comic Sans energy, no primary-color overload, no balloon buttons.",
+      "Don't use a colored side-stripe border as an accent.",
+      "Don't put a gradient on text or a display font on a functional label.",
+      "Don't animate layout properties or use bounce/elastic easing."
+    ]
+  }
+}
