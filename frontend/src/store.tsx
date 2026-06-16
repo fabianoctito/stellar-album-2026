@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
-import { connect as walletConnect } from "./lib/wallet";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { connect as walletConnect, restore as walletRestore, disconnect as walletDisconnect } from "./lib/wallet";
 import { ensureFunded } from "./lib/friendbot";
 import { makeClients } from "./lib/clients";
 import { TYPES } from "./lib/catalog";
@@ -38,6 +38,7 @@ export interface Store {
   error?: string;
   reveal?: number[];
   connect(): Promise<void>;
+  disconnect(): void;
   claim(): Promise<void>;
   buy(): Promise<void>;
   open(): Promise<void>;
@@ -126,6 +127,45 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const disconnect = () => {
+    walletDisconnect();
+    setAddress(undefined);
+    setClients(undefined);
+    setCoin(0);
+    setPacks(0);
+    setCollection([]);
+    setPasted([]);
+    setOffers([]);
+    setHasAlbum(false);
+    setClaimAt(0);
+    setError(undefined);
+  };
+
+  // On load, silently re-establish a previously-connected wallet session so a
+  // page refresh doesn't force the user to reconnect. No-op if there's no saved
+  // session (or it can't be restored), in which case the connect screen shows.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const addr = await walletRestore();
+      if (!addr || cancelled) return;
+      setBusy("Reconnecting");
+      try {
+        const c = makeClients(addr);
+        setAddress(addr);
+        setClients(c);
+        await refresh(c, addr);
+      } catch {
+        /* leave on the connect screen */
+      } finally {
+        if (!cancelled) setBusy(undefined);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const sendThen = (label: string, build: (c: Clients, addr: string) => Promise<{ signAndSend(): Promise<unknown> }>) =>
     run(label, async (c, addr) => {
       await (await build(c, addr)).signAndSend();
@@ -180,7 +220,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value: Store = {
     address, coin, packs, collection, pasted, offers, hasAlbum, claimAt, busy, error, reveal,
-    connect, claim, buy, open, dismissReveal, openAlbum, paste, createOffer, acceptOffer, cancelOffer, reloadOffers,
+    connect, disconnect, claim, buy, open, dismissReveal, openAlbum, paste, createOffer, acceptOffer, cancelOffer, reloadOffers,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -16,7 +16,7 @@ const NAV = [
 ];
 
 export default function App() {
-  const { address, coin, packs, connect, busy, error } = useStore();
+  const { address, coin, packs, connect, disconnect, busy, error } = useStore();
   const location = useLocation();
   const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
@@ -51,7 +51,13 @@ export default function App() {
                 <div className="order-2 flex items-center gap-2 text-sm sm:order-3">
                   <span className="rounded-full bg-leaf-tint px-3 py-1 font-display font-bold text-leaf-deep">{coin} ⭐</span>
                   <span className="rounded-full bg-paper px-3 py-1 text-ink-soft ring-1 ring-edge">{packs} {packs === 1 ? "pack" : "packs"}</span>
-                  <span className="hidden font-mono text-xs text-ink-soft lg:inline">{short(address)}</span>
+                  <button
+                    onClick={disconnect}
+                    title="Disconnect wallet"
+                    className="hidden items-center gap-1 rounded-full px-2 py-1 font-mono text-xs text-ink-soft transition hover:bg-paper hover:text-ink lg:inline-flex"
+                  >
+                    {short(address)} <span aria-hidden>⏻</span>
+                  </button>
                 </div>
               </>
             )}

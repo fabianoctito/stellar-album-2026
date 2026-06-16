@@ -17,6 +17,11 @@ export const kit = new StellarWalletsKit({
   modules: allowAllModules(),
 });
 
+// Which wallet the user last connected with. Persisting just the wallet id (not
+// keys — those never leave the wallet) lets us silently re-establish the session
+// after a page reload instead of forcing a reconnect.
+const WALLET_KEY = "stellar-album:wallet-id";
+
 /** Open the wallet picker and return the selected account address. */
 export async function connect(): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -25,6 +30,7 @@ export async function connect(): Promise<string> {
         try {
           kit.setWallet(option.id);
           const { address } = await kit.getAddress();
+          localStorage.setItem(WALLET_KEY, option.id);
           resolve(address);
         } catch (e) {
           reject(e);
@@ -33,6 +39,29 @@ export async function connect(): Promise<string> {
       onClosed: () => reject(new Error("wallet selection cancelled")),
     });
   });
+}
+
+/**
+ * Silently restore a previously-connected wallet on page load. Returns the
+ * address, or `null` if there's no saved session or it can't be restored (e.g.
+ * the wallet is locked or no longer authorizes this site) — in which case the
+ * caller just shows the connect screen.
+ */
+export async function restore(): Promise<string | null> {
+  const id = localStorage.getItem(WALLET_KEY);
+  if (!id) return null;
+  try {
+    kit.setWallet(id);
+    const { address } = await kit.getAddress();
+    return address || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Forget the saved session (sign out). */
+export function disconnect(): void {
+  localStorage.removeItem(WALLET_KEY);
 }
 
 /** Sign callback handed to the generated contract clients. */
