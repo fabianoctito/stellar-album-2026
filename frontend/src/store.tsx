@@ -29,7 +29,7 @@ export interface Store {
   open(): Promise<void>;
   dismissReveal(): void;
   openAlbum(): Promise<void>;
-  paste(t: number): Promise<void>;
+  paste(t: number): Promise<boolean>;
   createOffer(give: number, want: number): Promise<string | undefined>;
   acceptOffer(id: string): Promise<void>;
   cancelOffer(id: string): Promise<void>;
@@ -117,7 +117,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const claim = () => sendThen("Claiming coins", (c, addr) => c.faucet.claim({ claimer: addr }));
   const buy = () => sendThen("Buying a pack", (c, addr) => c.store.buy_pack({ buyer: addr }));
   const openAlbum = () => sendThen("Binding album", (c, addr) => c.album.open_album({ owner: addr }));
-  const paste = (t: number) => sendThen("Pasting", (c, addr) => c.album.paste({ owner: addr, sticker_type: t }));
+  const paste = (t: number) =>
+    run("Pasting", async (c, addr) => {
+      await (await c.album.paste({ owner: addr, sticker_type: t })).signAndSend();
+      await refresh(c, addr);
+      return true;
+    }).then((ok) => ok === true);
   const acceptOffer = (id: string) => sendThen("Accepting offer", (c, addr) => c.escrow.accept_offer({ taker: addr, offer_id: BigInt(id) }));
   const cancelOffer = (id: string) => sendThen("Taking it back", (c) => c.escrow.cancel_offer({ offer_id: BigInt(id) }));
 

@@ -1,15 +1,39 @@
 import { AnimatePresence, motion } from "framer-motion";
+import { useState } from "react";
 import { useStore } from "../store";
 import { Page, SectionHead, ProgressMeter, Toast } from "../components/ui";
 import { Sticker } from "../components/Sticker";
-import { TIER_FACE, tier, TYPE_COUNT, TYPES } from "../lib/catalog";
+import { Confetti } from "../components/Confetti";
+import {
+  ALBUM_PAGES,
+  pageOfType,
+  pageTypes,
+  stickerName,
+  tier,
+  TIER_FACE,
+  TIER_GLYPH,
+  TYPE_COUNT,
+  TYPES,
+} from "../lib/catalog";
 
+const TURN = { duration: 0.5, ease: [0.22, 1, 0.36, 1] } as const;
 const SETTLE = { duration: 0.45, ease: [0.22, 1, 0.36, 1] } as const;
+
+const leafVariants = {
+  enter: (d: number) => ({ rotateY: d > 0 ? 62 : -62, opacity: 0 }),
+  center: { rotateY: 0, opacity: 1 },
+  exit: (d: number) => ({ rotateY: d > 0 ? -62 : 62, opacity: 0 }),
+};
 
 export default function Album() {
   const { hasAlbum, openAlbum, pasted, collection, paste, busy, error } = useStore();
+  const [page, setPage] = useState(0);
+  const [dir, setDir] = useState(1);
+  const [confetti, setConfetti] = useState(0);
+
   const filled = pasted.filter(Boolean).length;
   const tray = TYPES.filter((t) => (collection[t] ?? 0) > 0 && !pasted[t]);
+  const last = ALBUM_PAGES.length - 1;
 
   if (!hasAlbum) {
     return (
@@ -21,13 +45,8 @@ export default function Album() {
           </div>
           <div>
             <h3 className="font-display text-xl font-bold text-ink">Bind your album</h3>
-            <p className="mt-1 max-w-sm text-sm text-ink-soft">
-              It is soulbound: it cannot be sold or transferred. Sticking a sticker presses it in permanently and burns it
-              from your drawer, so a finished album is something only you could have made.
-            </p>
-            <button onClick={openAlbum} disabled={!!busy} className="mt-4 rounded-full bg-leaf-deep px-5 py-2.5 text-sm font-bold text-paper transition hover:bg-leaf disabled:opacity-40">
-              Start my album
-            </button>
+            <p className="mt-1 max-w-sm text-sm text-ink-soft">It is soulbound: it cannot be sold or transferred. Sticking a sticker presses it in permanently and burns it from your drawer, so a finished album is something only you could have made.</p>
+            <button onClick={openAlbum} disabled={!!busy} className="mt-4 rounded-full bg-leaf-deep px-5 py-2.5 text-sm font-bold text-paper transition hover:bg-leaf disabled:opacity-40">Start my album</button>
           </div>
         </div>
         <Toast busy={busy} error={error} />
@@ -35,60 +54,67 @@ export default function Album() {
     );
   }
 
+  const leaf = ALBUM_PAGES[page];
+  const pageDone = pageTypes(leaf).every((t) => pasted[t]);
+  const goto = (p: number) => {
+    setDir(p > page ? 1 : -1);
+    setPage(p);
+  };
+
+  const onStick = async (t: number) => {
+    const p = pageOfType(t);
+    const willComplete = pageTypes(ALBUM_PAGES[p]).every((s) => s === t || pasted[s]);
+    const ok = await paste(t);
+    if (ok) {
+      goto(p);
+      if (tier(t) === "Legendary" || willComplete) setConfetti((n) => n + 1);
+    }
+  };
+
   return (
     <Page>
       <SectionHead title="Album" right={`${filled} of ${TYPE_COUNT}`} />
 
-      <div className="rounded-2xl bg-cream p-5 ring-1 ring-edge">
-        <ProgressMeter value={filled} max={TYPE_COUNT} />
-        <div className="mt-5 grid grid-cols-5 gap-2.5 sm:grid-cols-10">
-          {TYPES.map((t) =>
-            pasted[t] ? (
-              <motion.div
-                key={`filled-${t}`}
-                initial={{ scale: 1.25, rotate: -6, opacity: 0 }}
-                animate={{ scale: 1, rotate: 0, opacity: 1 }}
-                transition={SETTLE}
-                className={`flex aspect-[3/4] items-center justify-center rounded-lg font-display text-sm font-bold text-ink shadow-sm ${TIER_FACE[tier(t)]}`}
-              >
-                #{t}
+      <div className="relative">
+        {/* bound book: kraft cover wrapping a cream leaf */}
+        <div className="overflow-hidden rounded-[28px] bg-kraft p-3 shadow-xl ring-1 ring-edge">
+          <div className="relative min-h-[24rem] rounded-[20px] bg-cream" style={{ perspective: "1800px" }}>
+            <AnimatePresence mode="wait" custom={dir}>
+              <motion.div key={page} custom={dir} variants={leafVariants} initial="enter" animate="center" exit="exit" transition={TURN} className="relative p-5 sm:p-8" style={{ transformStyle: "preserve-3d" }}>
+                <div className="grid items-center gap-5 sm:grid-cols-2">
+                  <HeroSlot typeId={leaf.hero} filled={pasted[leaf.hero]} />
+                  <div className="grid grid-cols-2 gap-3">
+                    {leaf.slots.map((t) => <SmallSlot key={t} typeId={t} filled={pasted[t]} />)}
+                  </div>
+                </div>
+                <div className="mt-7 text-center font-display text-sm font-bold tracking-widest text-ink-soft">PAGE {page + 1} / {ALBUM_PAGES.length}</div>
+                {pageDone && <WaxSeal />}
               </motion.div>
-            ) : (
-              <div key={`empty-${t}`} className="flex aspect-[3/4] items-center justify-center rounded-lg border border-dashed border-edge text-xs text-ink-soft/40">
-                #{t}
-              </div>
-            ),
-          )}
+            </AnimatePresence>
+          </div>
         </div>
-        {filled === TYPE_COUNT && <p className="mt-5 text-center font-display font-bold text-leaf-deep">Album complete. You collected the whole crew.</p>}
+
+        <NavArrow side="left" onClick={() => goto(Math.max(0, page - 1))} disabled={page === 0} />
+        <NavArrow side="right" onClick={() => goto(Math.min(last, page + 1))} disabled={page === last} />
       </div>
 
-      <div className="mt-10">
-        <SectionHead
-          title="Ready to stick"
-          right={`${tray.length} loose`}
-          sub="Tap a sticker to press it in. This burns the sticker and fills its slot, for good."
-        />
+      <div className="mt-4 flex items-center justify-center gap-2">
+        {ALBUM_PAGES.map((p, i) => (
+          <button key={i} onClick={() => goto(i)} aria-label={`Go to page ${i + 1}`} aria-current={i === page ? "page" : undefined} className={`h-2.5 rounded-full transition-all ${i === page ? "w-7 bg-leaf" : "w-2.5 bg-kraft hover:bg-edge"}`} />
+        ))}
+      </div>
+
+      <div className="mx-auto mt-5 max-w-sm"><ProgressMeter value={filled} max={TYPE_COUNT} /></div>
+
+      <div className="mt-12">
+        <SectionHead title="Ready to stick" right={`${tray.length} loose`} sub="Tap to press a sticker in. The book turns to its page and the slot fills. This burns the sticker, for good." />
         {tray.length === 0 ? (
-          <p className="rounded-2xl bg-cream px-5 py-8 text-center text-ink-soft ring-1 ring-edge">
-            Nothing loose to stick. Open more packs to find the slots you are missing.
-          </p>
+          <p className="rounded-2xl bg-cream px-5 py-8 text-center text-ink-soft ring-1 ring-edge">Nothing loose to stick. Open more packs to find the slots you are missing.</p>
         ) : (
           <motion.div layout className="grid grid-cols-3 gap-3 sm:grid-cols-6">
             <AnimatePresence>
               {tray.map((t) => (
-                <motion.button
-                  key={t}
-                  layout
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, y: -34, scale: 0.55, rotate: -8 }}
-                  transition={SETTLE}
-                  whileHover={{ y: -4 }}
-                  onClick={() => paste(t)}
-                  disabled={!!busy}
-                  className="flex flex-col gap-1.5 rounded-2xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-leaf disabled:opacity-50"
-                >
+                <motion.button key={t} layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, y: -44, scale: 0.5, rotate: -10 }} transition={SETTLE} whileHover={{ y: -5 }} onClick={() => onStick(t)} disabled={!!busy} className="flex flex-col gap-1.5 rounded-2xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-leaf disabled:opacity-50">
                   <Sticker typeId={t} qty={collection[t]} />
                   <span className="rounded-lg bg-leaf-tint py-1 text-center text-xs font-bold text-leaf-deep">Stick it in</span>
                 </motion.button>
@@ -99,6 +125,55 @@ export default function Album() {
       </div>
 
       <Toast busy={busy} error={error} />
+      <AnimatePresence>{confetti > 0 && <Confetti key={confetti} onDone={() => setConfetti(0)} />}</AnimatePresence>
     </Page>
+  );
+}
+
+function HeroSlot({ typeId, filled }: { typeId: number; filled: boolean }) {
+  const t = tier(typeId);
+  if (filled) {
+    return (
+      <motion.div initial={{ scale: 1.22, rotate: -4, opacity: 0 }} animate={{ scale: 1, rotate: 0, opacity: 1 }} transition={SETTLE} className={`relative flex aspect-[4/5] flex-col items-center justify-center rounded-3xl shadow-lg ${TIER_FACE[t]}`}>
+        <div className="relative z-10 text-7xl" aria-hidden>🧑‍🚀</div>
+        <div className="relative z-10 mt-2 font-display text-xl font-extrabold text-ink">{stickerName(typeId)}</div>
+        <div className="relative z-10 mt-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-ink-soft"><span aria-hidden>{TIER_GLYPH[t]}</span>{t}</div>
+      </motion.div>
+    );
+  }
+  return (
+    <div className="flex aspect-[4/5] flex-col items-center justify-center rounded-3xl border-2 border-dashed border-edge bg-cream shadow-[inset_0_3px_12px_oklch(0.5_0.02_150/0.12)]">
+      <div className="text-6xl opacity-15" aria-hidden>🧑‍🚀</div>
+      <div className="mt-3 flex items-center gap-1.5 font-display text-sm font-bold uppercase tracking-widest text-ink-soft"><span aria-hidden>{TIER_GLYPH[t]}</span>{t}</div>
+      <div className="font-display text-2xl font-extrabold text-ink-soft/50">#{typeId}</div>
+      <div className="mt-1 text-xs text-ink-soft">Star of this page</div>
+    </div>
+  );
+}
+
+function SmallSlot({ typeId, filled }: { typeId: number; filled: boolean }) {
+  if (filled) {
+    return (
+      <motion.div initial={{ scale: 1.18, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={SETTLE} className={`flex aspect-[3/4] items-center justify-center rounded-xl font-display text-sm font-bold text-ink shadow-sm ${TIER_FACE[tier(typeId)]}`}>
+        #{typeId}
+      </motion.div>
+    );
+  }
+  return <div className="flex aspect-[3/4] items-center justify-center rounded-xl border border-dashed border-edge text-xs text-ink-soft/40 shadow-[inset_0_2px_7px_oklch(0.5_0.02_150/0.1)]">#{typeId}</div>;
+}
+
+function WaxSeal() {
+  return (
+    <motion.div initial={{ scale: 0, rotate: -32, opacity: 0 }} animate={{ scale: 1, rotate: -12, opacity: 1 }} transition={SETTLE} className="pointer-events-none absolute right-5 top-3 grid h-16 w-16 place-items-center rounded-full bg-leaf text-paper shadow-lg legendary-foil">
+      <span className="relative z-10 font-display text-[11px] font-extrabold uppercase tracking-wide">Done</span>
+    </motion.div>
+  );
+}
+
+function NavArrow({ side, onClick, disabled }: { side: "left" | "right"; onClick: () => void; disabled: boolean }) {
+  return (
+    <button onClick={onClick} disabled={disabled} aria-label={side === "left" ? "Previous page" : "Next page"} className={`absolute top-1/2 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-paper font-display text-xl font-bold text-ink shadow-md ring-1 ring-edge transition hover:bg-cream disabled:opacity-30 sm:grid ${side === "left" ? "-left-5" : "-right-5"}`}>
+      {side === "left" ? "‹" : "›"}
+    </button>
   );
 }

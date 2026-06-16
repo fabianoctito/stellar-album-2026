@@ -34,3 +34,24 @@ export const TIER_GLYPH: Record<Tier, string> = {
 export function stickerName(typeId: number): string {
   return `SDF #${typeId}`;
 }
+
+// Album leaves: each page is built around a hero (its rarest sticker) plus a
+// supporting cast. Two legendary-hero pages, then two rare-hero pages.
+export interface AlbumPage {
+  hero: number;
+  slots: number[];
+}
+export const ALBUM_PAGES: AlbumPage[] = [
+  { hero: 18, slots: [0, 1, 2, 3] }, // legendary
+  { hero: 19, slots: [4, 5, 6, 7] }, // legendary
+  { hero: 12, slots: [13, 14, 8, 9] }, // rare
+  { hero: 16, slots: [15, 17, 10, 11] }, // rare
+];
+
+export function pageTypes(page: AlbumPage): number[] {
+  return [page.hero, ...page.slots];
+}
+
+export function pageOfType(typeId: number): number {
+  return ALBUM_PAGES.findIndex((p) => p.hero === typeId || p.slots.includes(typeId));
+}
