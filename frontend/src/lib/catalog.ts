@@ -9,10 +9,24 @@ export function tier(typeId: number): Tier {
   return "Legendary";
 }
 
-export const TIER_STYLE: Record<Tier, string> = {
-  Common: "from-slate-100 to-slate-200 ring-slate-300 text-slate-700",
-  Rare: "from-sky-100 to-sky-300 ring-sky-400 text-sky-900",
-  Legendary: "from-amber-100 to-amber-300 ring-amber-400 text-amber-900",
+// Sticker-face styling per tier. Legendary adds the holographic sheen.
+export const TIER_FACE: Record<Tier, string> = {
+  Common: "bg-cream ring-1 ring-edge",
+  Rare: "bg-rare-tint ring-1 ring-rare/40",
+  Legendary: "bg-gold/20 ring-1 ring-gold/70 legendary-foil",
+};
+
+export const TIER_LABEL: Record<Tier, string> = {
+  Common: "text-ink-soft",
+  Rare: "text-rare",
+  Legendary: "text-ink",
+};
+
+// Non-color cue so rarity does not rely on color alone (a11y).
+export const TIER_GLYPH: Record<Tier, string> = {
+  Common: "●",
+  Rare: "◆",
+  Legendary: "✦",
 };
 
 // Placeholder identities until real SDF art/metadata (decision D15).

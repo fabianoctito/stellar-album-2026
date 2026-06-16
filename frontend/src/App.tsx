@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { connect } from "./lib/wallet";
 import { ensureFunded } from "./lib/friendbot";
 import { makeClients } from "./lib/clients";
-import { stickerName, tier, TIER_STYLE, TYPE_COUNT } from "./lib/catalog";
+import { stickerName, tier, TIER_FACE, TIER_GLYPH, TIER_LABEL, TYPE_COUNT } from "./lib/catalog";
 
 type Clients = ReturnType<typeof makeClients>;
 const TYPES = Array.from({ length: TYPE_COUNT }, (_, i) => i);
@@ -15,6 +15,12 @@ function fmtRemaining(sec: number): string {
   return `${Math.max(1, Math.floor(sec))}s`;
 }
 
+async function readCollection(c: Clients, owner: string): Promise<number[]> {
+  return Promise.all(
+    TYPES.map((t) => c.sticker.balance({ owner, sticker_type: t }).then((r) => Number(r.result))),
+  );
+}
+
 export default function App() {
   const [address, setAddress] = useState<string>();
   const [clients, setClients] = useState<Clients>();
@@ -24,13 +30,13 @@ export default function App() {
   const [pasted, setPasted] = useState<boolean[]>([]);
   const [hasAlbum, setHasAlbum] = useState(false);
   const [drawn, setDrawn] = useState<number[]>();
+  const [showReveal, setShowReveal] = useState(false);
   const [claimAt, setClaimAt] = useState(0);
   const [busy, setBusy] = useState<string>();
   const [error, setError] = useState<string>();
 
-  // Trade form
-  const [giveType, setGiveType] = useState<number>(0);
-  const [wantType, setWantType] = useState<number>(1);
+  const [giveType, setGiveType] = useState(0);
+  const [wantType, setWantType] = useState(1);
   const [createdOfferId, setCreatedOfferId] = useState<string>();
   const [acceptId, setAcceptId] = useState("");
 
@@ -38,6 +44,7 @@ export default function App() {
   const now = Date.now() / 1000;
   const claimReady = claimAt === 0 || now >= claimAt;
   const ownedTypes = TYPES.filter((t) => (collection[t] ?? 0) > 0);
+  const filled = pasted.filter(Boolean).length;
 
   async function refresh(c: Clients, addr: string): Promise<number[]> {
     const [coinR, packR, lastR, cdR, hasAlbumR] = await Promise.all([
@@ -49,12 +56,10 @@ export default function App() {
     ]);
     setCoin(Number(coinR.result));
     setPacks(Number(packR.result));
-    const last = Number(lastR.result);
-    setClaimAt(last === 0 ? 0 : last + Number(cdR.result));
+    setClaimAt(Number(lastR.result) === 0 ? 0 : Number(lastR.result) + Number(cdR.result));
     setHasAlbum(Boolean(hasAlbumR.result));
-
     const [coll, past] = await Promise.all([
-      Promise.all(TYPES.map((t) => c.sticker.balance({ owner: addr, sticker_type: t }).then((r) => Number(r.result)))),
+      readCollection(c, addr),
       Promise.all(TYPES.map((t) => c.album.is_pasted({ owner: addr, sticker_type: t }).then((r) => Boolean(r.result)))),
     ]);
     setCollection(coll);
@@ -86,42 +91,38 @@ export default function App() {
 
   const send = (label: string, build: () => Promise<{ signAndSend: () => Promise<unknown> }>) =>
     run(label, async () => {
-      const tx = await build();
-      await tx.signAndSend();
+      await (await build()).signAndSend();
       await refresh(clients!, address!);
     });
 
-  const onClaim = () => send("Claiming", () => clients!.faucet.claim({ claimer: address! }));
-  const onBuy = () => send("Buying pack", () => clients!.store.buy_pack({ buyer: address! }));
-  const onOpenAlbum = () => send("Opening album", () => clients!.album.open_album({ owner: address! }));
-  const onPaste = (t: number) =>
-    send("Pasting", () => clients!.album.paste({ owner: address!, sticker_type: t }));
+  const onClaim = () => send("Claiming coins", () => clients!.faucet.claim({ claimer: address! }));
+  const onBuy = () => send("Buying a pack", () => clients!.store.buy_pack({ buyer: address! }));
+  const onOpenAlbum = () => send("Binding album", () => clients!.album.open_album({ owner: address! }));
+  const onPaste = (t: number) => send("Pasting", () => clients!.album.paste({ owner: address!, sticker_type: t }));
 
   const onOpen = () =>
-    run("Opening pack", async () => {
-      setDrawn(undefined);
+    run("Ripping the pack", async () => {
+      setShowReveal(false);
       const before = await refresh(clients!, address!);
       const sent = await (await clients!.pack.open({ opener: address! })).signAndSend();
       const resp = sent.getTransactionResponse as unknown as { status?: string };
-      if (resp?.status && resp.status !== "SUCCESS") {
-        throw new Error(`open reverted on-chain (status=${resp.status})`);
-      }
+      if (resp?.status && resp.status !== "SUCCESS") throw new Error(`pack open reverted on-chain (status=${resp.status})`);
       const after = await refresh(clients!, address!);
       const d: number[] = [];
       for (const t of TYPES) for (let k = 0; k < after[t] - before[t]; k++) d.push(t);
+      if (d.length === 0) throw new Error("pack opened but no new stickers were detected");
       setDrawn(d);
+      setShowReveal(true);
     });
 
   const onCreateOffer = () =>
-    run("Creating offer", async () => {
-      const sent = await (
-        await clients!.escrow.create_offer({ maker: address!, give_type: giveType, want_type: wantType })
-      ).signAndSend();
+    run("Putting it on the table", async () => {
+      const sent = await (await clients!.escrow.create_offer({ maker: address!, give_type: giveType, want_type: wantType })).signAndSend();
       let id = "?";
       try {
         id = String(sent.result);
       } catch {
-        /* id parse is best-effort */
+        /* best-effort id */
       }
       setCreatedOfferId(id);
       await refresh(clients!, address!);
@@ -130,176 +131,217 @@ export default function App() {
   const onAcceptOffer = () =>
     send("Accepting offer", () => clients!.escrow.accept_offer({ taker: address!, offer_id: BigInt(acceptId) }));
   const onCancelOffer = (id: string) =>
-    run("Cancelling offer", async () => {
+    run("Taking it back", async () => {
       await (await clients!.escrow.cancel_offer({ offer_id: BigInt(id) })).signAndSend();
       setCreatedOfferId(undefined);
       await refresh(clients!, address!);
     });
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-white text-slate-800">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white/70 px-6 py-4 backdrop-blur">
-        <h1 className="text-xl font-bold">⭐ Stellar Album</h1>
-        {address ? (
-          <div className="flex items-center gap-4 text-sm">
-            <span className="rounded-full bg-indigo-100 px-3 py-1 font-semibold text-indigo-800">{coin} ⭐</span>
-            <span className="rounded-full bg-slate-100 px-3 py-1">{packs} packs</span>
-            <span className="text-slate-500">{short(address)}</span>
+    <div className="relative z-10 min-h-screen">
+      <header className="sticky top-0 z-20 border-b border-edge bg-kraft">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-5 py-3">
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-display text-2xl font-extrabold tracking-tight text-ink">Stellar Album</span>
+            <span className="text-leaf">✦</span>
           </div>
-        ) : (
-          <button onClick={onConnect} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
-            Connect wallet
-          </button>
-        )}
+          {address && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="rounded-full bg-leaf-tint px-3 py-1 font-display font-bold text-leaf-deep">{coin} ⭐</span>
+              <span className="rounded-full bg-paper px-3 py-1 text-ink-soft ring-1 ring-edge">{packs} {packs === 1 ? "pack" : "packs"}</span>
+              <span className="hidden rounded-full bg-paper px-3 py-1 font-mono text-xs text-ink-soft ring-1 ring-edge sm:inline">{short(address)}</span>
+            </div>
+          )}
+        </div>
       </header>
 
-      <main className="mx-auto max-w-3xl space-y-8 px-6 py-10">
-        {!address && <p className="text-center text-slate-500">Connect a wallet to claim coins, buy a pack, and open it.</p>}
-
-        {address && (
-          <section className="grid grid-cols-3 gap-3">
-            <Action label="Claim coins" hint={claimReady ? "from the Faucet" : `next in ${fmtRemaining(claimAt - now)}`} onClick={onClaim} disabled={!!busy || !claimReady} />
-            <Action label="Buy pack" hint="100 ⭐" onClick={onBuy} disabled={!!busy || coin < 100} />
-            <Action label="Open pack" hint={packs > 0 ? "reveal 3 stickers" : "no packs"} onClick={onOpen} disabled={!!busy || packs < 1} />
+      {!address ? (
+        <section className="mx-auto max-w-xl px-6 py-20 text-center">
+          <div className="mx-auto mb-10 grid h-44 w-36 place-items-center rounded-3xl bg-leaf-deep legendary-foil shadow-xl" style={{ transform: "rotate(-6deg)" }}>
+            <span className="font-display text-2xl font-extrabold tracking-wide text-paper">PACK</span>
+          </div>
+          <h1 className="font-display text-4xl font-extrabold leading-tight text-ink sm:text-5xl">Collect the people who build Stellar.</h1>
+          <p className="mx-auto mt-4 max-w-md text-ink-soft">Claim coins, rip open packs of SDF stickers, press your favourites into a soulbound album, and swap your doubles. Live on Stellar testnet.</p>
+          <button onClick={onConnect} disabled={!!busy} className="mt-8 rounded-full bg-leaf-deep px-7 py-3.5 font-display text-lg font-bold text-paper shadow-md transition hover:bg-leaf focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-leaf disabled:opacity-50">
+            {busy ? `${busy}…` : "Connect wallet to start"}
+          </button>
+          <p className="mt-3 text-xs text-ink-soft">Freighter on Testnet. We fund your account for you, no XLM needed.</p>
+          {error && <p className="mx-auto mt-5 max-w-md rounded-xl bg-paper px-4 py-3 text-sm text-ink ring-1 ring-edge">{error}</p>}
+        </section>
+      ) : (
+        <main className="mx-auto max-w-4xl px-5 pb-24">
+          {/* Counter: claim + buy are secondary; ripping a pack is the hero. */}
+          <section className="pt-8">
+            <div className="flex flex-col gap-3 rounded-2xl bg-kraft p-3 ring-1 ring-edge sm:flex-row">
+              <div className="flex flex-1 gap-2">
+                <CounterButton title="Claim coins" sub={claimReady ? "free from the faucet" : `ready in ${fmtRemaining(claimAt - now)}`} onClick={onClaim} disabled={!!busy || !claimReady} />
+                <CounterButton title="Buy a pack" sub="100 ⭐" onClick={onBuy} disabled={!!busy || coin < 100} />
+              </div>
+              <button onClick={onOpen} disabled={!!busy || packs < 1} className="rounded-xl bg-leaf-deep px-6 py-4 font-display text-lg font-bold text-paper shadow-md transition hover:bg-leaf focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-leaf disabled:opacity-40 disabled:shadow-none sm:min-w-[38%]">
+                {packs > 0 ? `Rip a pack · ${packs}` : "No packs to open"}
+              </button>
+            </div>
+            {busy && <p className="mt-3 text-center text-sm text-leaf-deep" role="status">{busy}…</p>}
+            {error && <p className="mt-3 rounded-xl bg-paper px-4 py-3 text-sm text-ink ring-1 ring-edge" role="alert">{error}</p>}
           </section>
-        )}
 
-        {busy && <p className="text-center text-indigo-600">{busy}…</p>}
-        {error && <p className="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
-
-        {drawn && (
-          <section>
-            <h2 className="mb-3 text-center text-sm font-semibold uppercase tracking-wide text-slate-400">You pulled</h2>
-            <div className="grid grid-cols-3 gap-4" style={{ perspective: "800px" }}>
-              {drawn.map((t, i) => (
-                <div key={i} style={{ animation: "pop-in 0.5s ease-out both", animationDelay: `${i * 0.2}s` }}>
-                  <Sticker typeId={t} />
+          {/* Album */}
+          <section className="pt-12">
+            <SectionHead title="Album" right={hasAlbum ? `${filled} of ${TYPE_COUNT}` : "soulbound, one per collector"} />
+            {!hasAlbum ? (
+              <div className="flex flex-col items-center gap-5 rounded-2xl bg-cream p-6 ring-1 ring-edge sm:flex-row">
+                <div className="grid h-28 w-24 shrink-0 place-items-center rounded-xl bg-kraft ring-1 ring-edge" style={{ transform: "rotate(-3deg)" }}>
+                  <span className="font-display text-sm font-bold text-ink-soft">EMPTY</span>
                 </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {address && (
-          <section>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Your collection</h2>
-              <span className="text-sm text-slate-500">{ownedTypes.length}/{TYPE_COUNT} types</span>
-            </div>
-            {ownedTypes.length === 0 ? (
-              <p className="text-center text-slate-400">No stickers yet — open a pack!</p>
+                <div className="text-center sm:text-left">
+                  <h3 className="font-display text-lg font-bold text-ink">Bind your album</h3>
+                  <p className="mt-1 max-w-sm text-sm text-ink-soft">One per collector, yours forever. Pasting a sticker presses it in permanently, so it leaves your drawer for good.</p>
+                  <button onClick={onOpenAlbum} disabled={!!busy} className="mt-3 rounded-full bg-leaf-deep px-5 py-2 text-sm font-bold text-paper transition hover:bg-leaf disabled:opacity-40">Start my album</button>
+                </div>
+              </div>
             ) : (
-              <div className="grid grid-cols-4 gap-3 sm:grid-cols-5">
+              <div className="rounded-2xl bg-cream p-5 ring-1 ring-edge">
+                <ProgressMeter value={filled} max={TYPE_COUNT} />
+                <div className="mt-4 grid grid-cols-5 gap-2 sm:grid-cols-10">
+                  {TYPES.map((t) =>
+                    pasted[t] ? (
+                      <div key={t} className={`flex aspect-[3/4] items-center justify-center rounded-lg font-display text-sm font-bold text-ink ${TIER_FACE[tier(t)]}`}>#{t}</div>
+                    ) : (
+                      <div key={t} className="flex aspect-[3/4] items-center justify-center rounded-lg border border-dashed border-edge text-xs text-ink-soft/50">#{t}</div>
+                    ),
+                  )}
+                </div>
+                {filled === TYPE_COUNT && <p className="mt-4 text-center font-display font-bold text-leaf-deep">Album complete. You collected the whole crew.</p>}
+              </div>
+            )}
+          </section>
+
+          {/* Loose stickers / drawer */}
+          <section className="pt-12">
+            <SectionHead title="Your stickers" right={`${ownedTypes.length} of ${TYPE_COUNT} types`} />
+            {ownedTypes.length === 0 ? (
+              <p className="rounded-2xl bg-cream px-5 py-10 text-center text-ink-soft ring-1 ring-edge">Your drawer is empty. Rip open a pack to start collecting.</p>
+            ) : (
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
                 {ownedTypes.map((t) => (
-                  <div key={t} className="flex flex-col gap-1">
+                  <div key={t} className="flex flex-col gap-1.5">
                     <Sticker typeId={t} qty={collection[t]} />
                     {pasted[t] ? (
-                      <span className="text-center text-xs text-emerald-600">✓ in album</span>
+                      <span className="text-center text-xs font-semibold text-leaf-deep">✓ in album</span>
                     ) : hasAlbum ? (
-                      <button onClick={() => onPaste(t)} disabled={!!busy} className="rounded bg-emerald-600 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-40">
-                        Paste
-                      </button>
+                      <button onClick={() => onPaste(t)} disabled={!!busy} className="rounded-lg bg-leaf-tint py-1 text-xs font-bold text-leaf-deep transition hover:bg-leaf hover:text-paper disabled:opacity-40">Paste in</button>
                     ) : null}
                   </div>
                 ))}
               </div>
             )}
           </section>
-        )}
 
-        {address && (
-          <section className="rounded-xl border border-slate-200 bg-white p-5">
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Album</h2>
-            {!hasAlbum ? (
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-slate-500">Your soulbound album — one per person. Pasting a sticker burns it into a slot, forever.</p>
-                <button onClick={onOpenAlbum} disabled={!!busy} className="ml-4 shrink-0 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-40">
-                  Start album
-                </button>
+          {/* Trade */}
+          <section className="pt-12">
+            <SectionHead title="Trade" right="sticker for sticker, no middleman" />
+            <div className="rounded-2xl bg-cream p-5 ring-1 ring-edge">
+              <div className="flex flex-wrap items-end gap-3">
+                <Field label="You give">
+                  <select value={giveType} onChange={(e) => setGiveType(Number(e.target.value))} className="rounded-lg bg-paper px-3 py-2 text-sm ring-1 ring-edge focus-visible:outline-2 focus-visible:outline-leaf">
+                    {ownedTypes.length === 0 ? <option>nothing yet</option> : ownedTypes.map((t) => <option key={t} value={t}>#{t} ({collection[t]})</option>)}
+                  </select>
+                </Field>
+                <span className="pb-2 text-ink-soft">for</span>
+                <Field label="You want">
+                  <select value={wantType} onChange={(e) => setWantType(Number(e.target.value))} className="rounded-lg bg-paper px-3 py-2 text-sm ring-1 ring-edge focus-visible:outline-2 focus-visible:outline-leaf">
+                    {TYPES.map((t) => <option key={t} value={t}>#{t}</option>)}
+                  </select>
+                </Field>
+                <button onClick={onCreateOffer} disabled={!!busy || ownedTypes.length === 0} className="rounded-lg bg-leaf-deep px-4 py-2 text-sm font-bold text-paper transition hover:bg-leaf disabled:opacity-40">Put on the table</button>
               </div>
-            ) : (
-              <>
-                <p className="mb-3 text-sm text-slate-500">{pasted.filter(Boolean).length}/{TYPE_COUNT} slots filled{pasted.filter(Boolean).length === TYPE_COUNT && " — complete! 🎉"}</p>
-                <div className="grid grid-cols-5 gap-2 sm:grid-cols-10">
-                  {TYPES.map((t) =>
-                    pasted[t] ? (
-                      <div key={t} className={`flex aspect-[3/4] items-center justify-center rounded-lg bg-gradient-to-b text-xs font-bold ring-2 ${TIER_STYLE[tier(t)]}`}>#{t}</div>
-                    ) : (
-                      <div key={t} className="flex aspect-[3/4] items-center justify-center rounded-lg border-2 border-dashed border-slate-200 text-xs text-slate-300">#{t}</div>
-                    ),
-                  )}
-                </div>
-              </>
-            )}
+              {createdOfferId && (
+                <p className="mt-4 rounded-lg bg-leaf-tint px-4 py-3 text-sm text-leaf-deep">
+                  Offer <b>#{createdOfferId}</b> is on the table. 🔒 Your sticker is held in escrow until someone accepts. Share the number, or{" "}
+                  <button onClick={() => onCancelOffer(createdOfferId)} disabled={!!busy} className="font-bold underline">take it back</button>.
+                </p>
+              )}
+              <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-edge pt-4">
+                <Field label="Accept offer #">
+                  <input value={acceptId} onChange={(e) => setAcceptId(e.target.value)} inputMode="numeric" placeholder="id" className="w-28 rounded-lg bg-paper px-3 py-2 text-sm ring-1 ring-edge focus-visible:outline-2 focus-visible:outline-leaf" />
+                </Field>
+                <button onClick={onAcceptOffer} disabled={!!busy || !acceptId} className="rounded-lg bg-ink px-4 py-2 text-sm font-bold text-paper transition hover:opacity-90 disabled:opacity-40">Accept</button>
+              </div>
+            </div>
           </section>
-        )}
+        </main>
+      )}
 
-        {address && (
-          <section className="rounded-xl border border-slate-200 bg-white p-5">
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Trade (sticker ↔ sticker)</h2>
-            <div className="flex flex-wrap items-end gap-3">
-              <label className="text-sm">
-                Give
-                <select value={giveType} onChange={(e) => setGiveType(Number(e.target.value))} className="ml-2 rounded border border-slate-300 px-2 py-1">
-                  {ownedTypes.map((t) => (
-                    <option key={t} value={t}>#{t} ({collection[t]})</option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm">
-                Want
-                <select value={wantType} onChange={(e) => setWantType(Number(e.target.value))} className="ml-2 rounded border border-slate-300 px-2 py-1">
-                  {TYPES.map((t) => (
-                    <option key={t} value={t}>#{t}</option>
-                  ))}
-                </select>
-              </label>
-              <button onClick={onCreateOffer} disabled={!!busy || ownedTypes.length === 0} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-40">
-                Create offer
-              </button>
-            </div>
-            {createdOfferId && (
-              <p className="mt-3 text-sm text-emerald-700">
-                Offer <b>#{createdOfferId}</b> created — share this id; your sticker is held in escrow until accepted or cancelled.{" "}
-                <button onClick={() => onCancelOffer(createdOfferId)} disabled={!!busy} className="font-semibold underline">cancel</button>
-              </p>
-            )}
-            <div className="mt-4 flex items-end gap-3 border-t border-slate-100 pt-4">
-              <label className="text-sm">
-                Accept offer #
-                <input value={acceptId} onChange={(e) => setAcceptId(e.target.value)} inputMode="numeric" className="ml-2 w-24 rounded border border-slate-300 px-2 py-1" placeholder="id" />
-              </label>
-              <button onClick={onAcceptOffer} disabled={!!busy || !acceptId} className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900 disabled:opacity-40">
-                Accept
-              </button>
-            </div>
-          </section>
-        )}
-      </main>
+      {showReveal && drawn && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-7 bg-ink/60 px-6" style={{ animation: "scrim-in 0.25s ease-out both" }} onClick={() => setShowReveal(false)}>
+          <p className="font-display text-2xl font-extrabold text-paper">You ripped open a pack</p>
+          <div className="flex gap-3 sm:gap-5" style={{ perspective: "1000px" }} onClick={(e) => e.stopPropagation()}>
+            {drawn.map((t, i) => (
+              <div key={i} className="w-24 sm:w-36" style={{ animation: "pop-in 0.55s cubic-bezier(0.22,1,0.36,1) both", animationDelay: `${0.12 + i * 0.22}s` }}>
+                <Sticker typeId={t} big />
+              </div>
+            ))}
+          </div>
+          <button onClick={() => setShowReveal(false)} className="rounded-full bg-paper px-6 py-2.5 font-display font-bold text-ink shadow-md transition hover:bg-cream">Add to collection</button>
+        </div>
+      )}
     </div>
   );
 }
 
-function Action({ label, hint, onClick, disabled }: { label: string; hint: string; onClick: () => void; disabled: boolean }) {
+function CounterButton({ title, sub, onClick, disabled }: { title: string; sub: string; onClick: () => void; disabled: boolean }) {
   return (
-    <button onClick={onClick} disabled={disabled} className="flex flex-col items-center rounded-xl border border-slate-200 bg-white px-4 py-5 shadow-sm transition hover:shadow-md disabled:opacity-40 disabled:hover:shadow-sm">
-      <span className="font-semibold">{label}</span>
-      <span className="text-xs text-slate-500">{hint}</span>
+    <button onClick={onClick} disabled={disabled} className="flex flex-1 flex-col items-start rounded-xl bg-paper px-4 py-3 text-left ring-1 ring-edge transition hover:ring-leaf/50 focus-visible:outline-2 focus-visible:outline-leaf disabled:opacity-45 disabled:hover:ring-edge">
+      <span className="font-display font-bold text-ink">{title}</span>
+      <span className="text-xs text-ink-soft">{sub}</span>
     </button>
   );
 }
 
-// Identifiable object with a name + rarity. `qty` shows stacked duplicates.
-function Sticker({ typeId, qty }: { typeId: number; qty?: number }) {
+function SectionHead({ title, right }: { title: string; right?: string }) {
+  return (
+    <div className="mb-3 flex items-end justify-between">
+      <h2 className="font-display text-xl font-bold text-ink">{title}</h2>
+      {right && <span className="text-sm text-ink-soft">{right}</span>}
+    </div>
+  );
+}
+
+function ProgressMeter({ value, max }: { value: number; max: number }) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="h-2 flex-1 overflow-hidden rounded-full bg-kraft">
+        <div className="h-full origin-left rounded-full bg-leaf transition-transform duration-500" style={{ transform: `scaleX(${max ? value / max : 0})` }} />
+      </div>
+      <span className="font-display text-sm font-bold text-ink">{value}/{max}</span>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-ink-soft">
+      {label}
+      {children}
+    </label>
+  );
+}
+
+// The collectible itself: an identifiable object with a name + rarity.
+// `qty` shows stacked duplicates; legendary carries a holographic sheen.
+function Sticker({ typeId, qty, big }: { typeId: number; qty?: number; big?: boolean }) {
   const t = tier(typeId);
   return (
-    <div className={`relative flex aspect-[3/4] flex-col items-center justify-center rounded-xl bg-gradient-to-b ring-2 ${TIER_STYLE[t]}`}>
+    <div className={`relative flex aspect-[3/4] flex-col items-center justify-center rounded-2xl px-2 ${TIER_FACE[t]}`}>
       {qty != null && qty > 1 && (
-        <span className="absolute right-1 top-1 rounded-full bg-black/70 px-1.5 py-0.5 text-xs font-bold text-white">×{qty}</span>
+        <span className="absolute right-1.5 top-1.5 z-10 rounded-full bg-ink px-1.5 py-0.5 text-[10px] font-bold text-paper">×{qty}</span>
       )}
-      <div className="text-3xl">🧑‍🚀</div>
-      <div className="mt-2 text-sm font-bold">{stickerName(typeId)}</div>
-      <div className="text-xs uppercase tracking-wide opacity-80">{t}</div>
+      <div className={`relative z-10 ${big ? "text-5xl" : "text-3xl"}`} aria-hidden>🧑‍🚀</div>
+      <div className={`relative z-10 mt-1 font-display font-bold text-ink ${big ? "text-base" : "text-xs"}`}>{stickerName(typeId)}</div>
+      <div className={`relative z-10 mt-0.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide ${TIER_LABEL[t]}`}>
+        <span aria-hidden>{TIER_GLYPH[t]}</span>
+        {t}
+      </div>
     </div>
   );
 }
