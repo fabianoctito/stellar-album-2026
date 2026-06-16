@@ -1,5 +1,6 @@
 // Mirrors contracts/common: 20 types, tiers 0–11 common / 12–17 rare / 18–19 legendary.
 export const TYPE_COUNT = 20;
+export const TYPES = Array.from({ length: TYPE_COUNT }, (_, i) => i);
 
 export type Tier = "Common" | "Rare" | "Legendary";
 
