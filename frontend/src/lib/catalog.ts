@@ -2,6 +2,10 @@
 export const TYPE_COUNT = 20;
 export const TYPES = Array.from({ length: TYPE_COUNT }, (_, i) => i);
 
+// Stickers per pack — mirrors PACK_SIZE in contracts/pack. Used to group the
+// open result into individual packs for the reveal.
+export const PACK_SIZE = 3;
+
 export type Tier = "Common" | "Rare" | "Legendary";
 
 export function tier(typeId: number): Tier {
@@ -9,6 +13,9 @@ export function tier(typeId: number): Tier {
   if (typeId <= 17) return "Rare";
   return "Legendary";
 }
+
+// Rarity ordering, low → high. Single source of truth for "which tier wins".
+export const TIER_RANK: Record<Tier, number> = { Common: 0, Rare: 1, Legendary: 2 };
 
 // Sticker-face styling per tier. Legendary adds the holographic sheen.
 export const TIER_FACE: Record<Tier, string> = {

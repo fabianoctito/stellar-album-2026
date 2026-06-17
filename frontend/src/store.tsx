@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { connect as walletConnect, restore as walletRestore, disconnect as walletDisconnect } from "./lib/wallet";
 import { ensureFunded } from "./lib/friendbot";
 import { makeClients } from "./lib/clients";
-import { TYPES } from "./lib/catalog";
+import { TYPES, PACK_SIZE } from "./lib/catalog";
 
 type Clients = ReturnType<typeof makeClients>;
 
@@ -12,6 +12,32 @@ export interface Offer {
   maker: string;
   give: number;
   want: number;
+}
+
+/** One revealed sticker. `isNew` = its type isn't pasted in the album yet. */
+export interface RevealCard {
+  type: number;
+  isNew: boolean;
+}
+
+/** The result of opening one or more packs, for the cinematic reveal. */
+export interface RevealState {
+  /** Cards grouped by pack, in draw order (each inner array is one pack). */
+  packs: RevealCard[][];
+}
+
+/** Turn a raw wallet/chain exception into plain language for the UI. The
+ *  technical detail still goes to the console for debugging. */
+function friendlyError(e: unknown): string {
+  const raw = e instanceof Error ? e.message : String(e);
+  console.error(raw); // eslint-disable-line no-console
+  const m = raw.toLowerCase();
+  if (/(declin|reject|denied|cancel|user.*close)/.test(m)) return "You cancelled the request in your wallet.";
+  if (/(no wallet|not found|no module|not installed|install)/.test(m)) return "No Stellar wallet found. Install Freighter (or another) to continue.";
+  if (/(not enough|insufficient|balance)/.test(m)) return "You don't have enough for that.";
+  if (/(network|timeout|timed out|fetch|rpc|connection)/.test(m)) return "Network hiccup — please try again.";
+  if (/(revert|status=|failed|trap|panic)/.test(m)) return "That transaction didn't go through. Please try again.";
+  return raw;
 }
 
 async function readCollection(c: Clients, owner: string): Promise<number[]> {
@@ -36,9 +62,12 @@ export interface Store {
   claimAt: number;
   busy?: string;
   error?: string;
-  reveal?: number[];
+  reveal?: RevealState;
+  /** True while an open() is in flight, before the reveal data lands. */
+  opening: boolean;
   connect(): Promise<void>;
   disconnect(): void;
+  clearError(): void;
   claim(): Promise<void>;
   buy(): Promise<void>;
   open(): Promise<void>;
@@ -71,7 +100,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [claimAt, setClaimAt] = useState(0);
   const [busy, setBusy] = useState<string>();
   const [error, setError] = useState<string>();
-  const [reveal, setReveal] = useState<number[]>();
+  const [reveal, setReveal] = useState<RevealState>();
+  const [opening, setOpening] = useState(false);
 
   async function refresh(c: Clients, addr: string): Promise<number[]> {
     const [coinR, packR, lastR, cdR, hasAlbumR] = await Promise.all([
@@ -103,7 +133,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try {
       return await fn(clients, address);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(friendlyError(e));
       return undefined;
     } finally {
       setBusy(undefined);
@@ -121,7 +151,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setClients(c);
       await refresh(c, addr);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(friendlyError(e));
     } finally {
       setBusy(undefined);
     }
@@ -139,6 +169,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setHasAlbum(false);
     setClaimAt(0);
     setError(undefined);
+    setReveal(undefined);
+    setOpening(false);
   };
 
   // On load, silently re-establish a previously-connected wallet session so a
@@ -186,17 +218,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const open = async () => {
     setReveal(undefined);
+    setOpening(true);
     await run("Ripping the pack", async (c, addr) => {
-      const before = await refresh(c, addr);
       const sent = await (await c.pack.open({ opener: addr })).signAndSend();
       const resp = sent.getTransactionResponse as unknown as { status?: string };
       if (resp?.status && resp.status !== "SUCCESS") throw new Error(`pack open reverted on-chain (status=${resp.status})`);
-      const after = await refresh(c, addr);
-      const d: number[] = [];
-      for (const t of TYPES) for (let k = 0; k < after[t] - before[t]; k++) d.push(t);
-      if (d.length === 0) throw new Error("pack opened but no new stickers were detected");
-      setReveal(d);
+      // Use the contract's ordered return value — a balance diff can't preserve
+      // draw order or per-pack grouping, both of which the reveal needs.
+      const result = sent.result as Array<number | bigint> | undefined;
+      const types = (Array.isArray(result) ? result : []).map(Number);
+      if (types.length === 0) throw new Error("pack opened but no stickers were returned");
+      const flat: RevealCard[] = types.map((t) => ({ type: t, isNew: !pasted[t] }));
+      const grouped: RevealCard[][] = [];
+      for (let i = 0; i < flat.length; i += PACK_SIZE) grouped.push(flat.slice(i, i + PACK_SIZE));
+      setReveal({ packs: grouped });
+      // The open already succeeded and the reveal is showing — a transient error
+      // refreshing balances shouldn't surface as an "open failed" toast.
+      try {
+        await refresh(c, addr);
+      } catch (e) {
+        console.error(e); // eslint-disable-line no-console
+      }
     });
+    setOpening(false);
   };
 
   const dismissReveal = () => setReveal(undefined);
@@ -219,8 +263,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     });
 
   const value: Store = {
-    address, coin, packs, collection, pasted, offers, hasAlbum, claimAt, busy, error, reveal,
-    connect, disconnect, claim, buy, open, dismissReveal, openAlbum, paste, createOffer, acceptOffer, cancelOffer, reloadOffers,
+    address, coin, packs, collection, pasted, offers, hasAlbum, claimAt, busy, error, reveal, opening,
+    connect, disconnect, clearError: () => setError(undefined), claim, buy, open, dismissReveal, openAlbum, paste, createOffer, acceptOffer, cancelOffer, reloadOffers,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

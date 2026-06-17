@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
 import { useStore } from "../store";
 import { Page, SectionHead, ProgressMeter, Toast } from "../components/ui";
+import { ConfirmDialog } from "../components/Dialog";
 import { Sticker } from "../components/Sticker";
 import { Confetti } from "../components/Confetti";
 import { stickerImage, stickerName } from "../lib/stickers";
@@ -26,10 +27,11 @@ const leafVariants = {
 };
 
 export default function Album() {
-  const { hasAlbum, openAlbum, pasted, collection, paste, busy, error } = useStore();
+  const { hasAlbum, openAlbum, pasted, collection, paste, busy, error, clearError } = useStore();
   const [page, setPage] = useState(0);
   const [dir, setDir] = useState(1);
   const [confetti, setConfetti] = useState(0);
+  const [confirm, setConfirm] = useState<number | null>(null); // type pending paste-confirm
 
   const filled = pasted.filter(Boolean).length;
   const tray = TYPES.filter((t) => (collection[t] ?? 0) > 0 && !pasted[t]);
@@ -46,10 +48,10 @@ export default function Album() {
           <div>
             <h3 className="font-display text-xl font-bold text-ink">Bind your album</h3>
             <p className="mt-1 max-w-sm text-sm text-ink-soft">It is soulbound: it cannot be sold or transferred. Sticking a sticker presses it in permanently and burns it from your drawer, so a finished album is something only you could have made.</p>
-            <button onClick={openAlbum} disabled={!!busy} className="mt-4 rounded-full bg-leaf-deep px-5 py-2.5 text-sm font-bold text-paper transition hover:bg-leaf disabled:opacity-40">Start my album</button>
+            <button onClick={openAlbum} disabled={!!busy} className="mt-4 rounded-full bg-leaf-deep px-5 py-2.5 text-sm font-bold text-paper transition hover:bg-leaf focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-leaf disabled:opacity-40">Start my album</button>
           </div>
         </div>
-        <Toast busy={busy} error={error} />
+        <Toast busy={busy} error={error} onDismiss={clearError} />
       </Page>
     );
   }
@@ -98,10 +100,15 @@ export default function Album() {
         <NavArrow side="right" onClick={() => goto(Math.min(last, page + 1))} disabled={page === last} />
       </div>
 
-      <div className="mt-4 flex items-center justify-center gap-2">
-        {ALBUM_PAGES.map((p, i) => (
-          <button key={i} onClick={() => goto(i)} aria-label={`Go to page ${i + 1}`} aria-current={i === page ? "page" : undefined} className={`h-2.5 rounded-full transition-all ${i === page ? "w-7 bg-leaf" : "w-2.5 bg-kraft hover:bg-edge"}`} />
-        ))}
+      <div className="mt-4 flex items-center justify-center gap-1">
+        {ALBUM_PAGES.map((p, i) => {
+          const done = pageTypes(p).every((t) => pasted[t]);
+          return (
+            <button key={i} onClick={() => goto(i)} aria-label={`Go to page ${i + 1}${done ? " (complete)" : ""}`} aria-current={i === page ? "page" : undefined} className="grid place-items-center p-2 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-leaf">
+              <span className={`h-2.5 rounded-full transition-all ${i === page ? "w-7 bg-leaf" : done ? "w-2.5 bg-leaf/50" : "w-2.5 bg-kraft hover:bg-edge"}`} />
+            </button>
+          );
+        })}
       </div>
 
       <div className="mx-auto mt-5 max-w-sm"><ProgressMeter value={filled} max={TYPE_COUNT} /></div>
@@ -114,7 +121,7 @@ export default function Album() {
           <motion.div layout className="grid grid-cols-3 gap-3 sm:grid-cols-6">
             <AnimatePresence>
               {tray.map((t) => (
-                <motion.button key={t} layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, y: -44, scale: 0.5, rotate: -10 }} transition={SETTLE} whileHover={{ y: -5 }} onClick={() => onStick(t)} disabled={!!busy} className="flex flex-col gap-1.5 rounded-2xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-leaf disabled:opacity-50">
+                <motion.button key={t} layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, y: -44, scale: 0.5, rotate: -10 }} transition={SETTLE} whileHover={{ y: -5 }} onClick={() => setConfirm(t)} disabled={!!busy} className="flex flex-col gap-1.5 rounded-2xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-leaf disabled:opacity-50">
                   <Sticker typeId={t} qty={collection[t]} />
                   <span className="rounded-lg bg-leaf-tint py-1 text-center text-xs font-bold text-leaf-deep">Stick it in</span>
                 </motion.button>
@@ -124,8 +131,42 @@ export default function Album() {
         )}
       </div>
 
-      <Toast busy={busy} error={error} />
+      <Toast busy={busy} error={error} onDismiss={clearError} />
       <AnimatePresence>{confetti > 0 && <Confetti key={confetti} onDone={() => setConfetti(0)} />}</AnimatePresence>
+
+      <AnimatePresence>
+        {confirm != null && (
+          <ConfirmDialog
+            title={`Paste ${stickerName(confirm)} in?`}
+            tone="danger"
+            confirmLabel="Paste it in"
+            busy={!!busy}
+            onClose={() => setConfirm(null)}
+            onConfirm={() => {
+              const t = confirm;
+              setConfirm(null);
+              onStick(t);
+            }}
+            body={
+              <>
+                This presses it into your album <b>permanently</b> and burns the sticker from your drawer — it can't be undone.
+                {tier(confirm) === "Legendary" && (
+                  <>
+                    {" "}
+                    It's a <b>Legendary</b>.
+                  </>
+                )}
+                {collection[confirm] === 1 && (
+                  <>
+                    {" "}
+                    This is your <b>only copy</b>.
+                  </>
+                )}
+              </>
+            }
+          />
+        )}
+      </AnimatePresence>
     </Page>
   );
 }
@@ -135,7 +176,7 @@ function HeroSlot({ typeId, filled }: { typeId: number; filled: boolean }) {
   if (filled) {
     return (
       <motion.div initial={{ scale: 1.22, rotate: -4, opacity: 0 }} animate={{ scale: 1, rotate: 0, opacity: 1 }} transition={SETTLE} className={`relative aspect-[4/5] overflow-hidden rounded-3xl shadow-lg ${TIER_FACE[t]}`}>
-        <img src={stickerImage(typeId)} alt={stickerName(typeId)} className="absolute inset-0 h-full w-full object-cover" />
+        <img src={stickerImage(typeId)} alt={stickerName(typeId)} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-ink/90 via-ink/45 to-transparent px-4 pb-4 pt-12">
           <div className="line-clamp-2 font-display text-xl font-extrabold leading-tight text-paper">{stickerName(typeId)}</div>
           <div className="mt-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-paper/80"><span aria-hidden>{TIER_GLYPH[t]}</span>{t}</div>
@@ -145,7 +186,7 @@ function HeroSlot({ typeId, filled }: { typeId: number; filled: boolean }) {
   }
   return (
     <div className="relative flex aspect-[4/5] flex-col items-center justify-center overflow-hidden rounded-3xl border-2 border-dashed border-edge bg-cream">
-      <img src={stickerImage(typeId)} alt="" className="absolute inset-0 h-full w-full object-cover opacity-15 grayscale" />
+      <img src={stickerImage(typeId)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover opacity-15 grayscale" />
       <div className="relative z-10 flex items-center gap-1.5 font-display text-sm font-bold uppercase tracking-widest text-ink-soft"><span aria-hidden>{TIER_GLYPH[t]}</span>{t}</div>
       <div className="relative z-10 line-clamp-1 px-3 text-center font-display text-base font-extrabold text-ink-soft/70">{stickerName(typeId)}</div>
       <div className="relative z-10 mt-1 text-xs text-ink-soft">Star of this page</div>
@@ -157,7 +198,7 @@ function SmallSlot({ typeId, filled }: { typeId: number; filled: boolean }) {
   if (filled) {
     return (
       <motion.div initial={{ scale: 1.18, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={SETTLE} className={`relative aspect-[3/4] overflow-hidden rounded-xl shadow-sm ${TIER_FACE[tier(typeId)]}`}>
-        <img src={stickerImage(typeId)} alt={stickerName(typeId)} className="absolute inset-0 h-full w-full object-cover" />
+        <img src={stickerImage(typeId)} alt={stickerName(typeId)} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-ink/90 to-transparent px-1.5 pb-1 pt-5">
           <div className="line-clamp-2 font-display text-[10px] font-bold leading-tight text-paper">{stickerName(typeId)}</div>
         </div>
@@ -166,7 +207,7 @@ function SmallSlot({ typeId, filled }: { typeId: number; filled: boolean }) {
   }
   return (
     <div className="relative flex aspect-[3/4] items-end justify-center overflow-hidden rounded-xl border border-dashed border-edge">
-      <img src={stickerImage(typeId)} alt="" className="absolute inset-0 h-full w-full object-cover opacity-10 grayscale" />
+      <img src={stickerImage(typeId)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover opacity-10 grayscale" />
       <span className="relative z-10 mb-1 line-clamp-2 px-1 text-center font-display text-[10px] font-semibold leading-tight text-ink-soft">{stickerName(typeId)}</span>
     </div>
   );
@@ -182,7 +223,7 @@ function WaxSeal() {
 
 function NavArrow({ side, onClick, disabled }: { side: "left" | "right"; onClick: () => void; disabled: boolean }) {
   return (
-    <button onClick={onClick} disabled={disabled} aria-label={side === "left" ? "Previous page" : "Next page"} className={`absolute top-1/2 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-paper font-display text-xl font-bold text-ink shadow-md ring-1 ring-edge transition hover:bg-cream disabled:opacity-30 sm:grid ${side === "left" ? "-left-5" : "-right-5"}`}>
+    <button onClick={onClick} disabled={disabled} aria-label={side === "left" ? "Previous page" : "Next page"} className={`absolute top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-paper font-display text-xl font-bold text-ink shadow-md ring-1 ring-edge transition hover:bg-cream focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-leaf disabled:opacity-30 ${side === "left" ? "-left-2 sm:-left-5" : "-right-2 sm:-right-5"}`}>
       {side === "left" ? "‹" : "›"}
     </button>
   );
