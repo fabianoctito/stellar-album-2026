@@ -6,13 +6,14 @@ import Collection from "./pages/Collection";
 import Album from "./pages/Album";
 import Trade from "./pages/Trade";
 import Guide from "./pages/Guide";
+import { PackArt } from "./components/PackArt";
 
 const NAV = [
-  { to: "/", label: "Shop", end: true },
+  { to: "/", label: "Counter", end: true },
   { to: "/collection", label: "Collection" },
   { to: "/album", label: "Album" },
   { to: "/trade", label: "Trade" },
-  { to: "/guide", label: "How it works" },
+  { to: "/guide", label: "Guide" },
 ];
 
 export default function App() {
@@ -23,24 +24,24 @@ export default function App() {
   return (
     <MotionConfig reducedMotion="user">
       <div className="relative z-10 min-h-screen">
-        <header className="sticky top-0 z-30 border-b border-edge bg-kraft">
-          <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-y-2 px-5 py-3">
-            <div className="flex items-baseline gap-1.5">
-              <span className="font-display text-2xl font-extrabold tracking-tight text-ink">Stellar Album</span>
+        <header className="sticky top-0 z-30 border-b border-edge bg-kraft/90 backdrop-blur">
+          <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-x-3 gap-y-2 px-5 py-2.5">
+            <div className="flex shrink-0 items-baseline gap-1.5">
+              <span className="font-display text-xl font-extrabold tracking-tight text-ink sm:text-2xl">Stellar Album</span>
               <span className="text-leaf">✦</span>
             </div>
 
             {address && (
               <>
-                <nav className="order-3 flex w-full gap-1 sm:order-2 sm:w-auto">
+                <nav className="order-3 flex w-full flex-wrap justify-center gap-0.5 md:order-2 md:w-auto md:flex-1">
                   {NAV.map((n) => (
                     <NavLink
                       key={n.to}
                       to={n.to}
                       end={n.end}
                       className={({ isActive }) =>
-                        `rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
-                          isActive ? "bg-leaf-deep text-paper" : "text-ink-soft hover:bg-paper"
+                        `rounded-full px-2.5 py-1.5 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-leaf ${
+                          isActive ? "bg-leaf-deep text-paper shadow-sm" : "text-ink-soft hover:bg-paper hover:text-ink"
                         }`
                       }
                     >
@@ -48,15 +49,16 @@ export default function App() {
                     </NavLink>
                   ))}
                 </nav>
-                <div className="order-2 flex items-center gap-2 text-sm sm:order-3">
-                  <span className="rounded-full bg-leaf-tint px-3 py-1 font-display font-bold text-leaf-deep">{coin} ⭐</span>
-                  <span className="rounded-full bg-paper px-3 py-1 text-ink-soft ring-1 ring-edge">{packs} {packs === 1 ? "pack" : "packs"}</span>
+                <div className="order-2 ml-auto flex shrink-0 items-center gap-1.5 text-sm md:order-3 md:ml-0">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-leaf-tint px-2.5 py-1 font-display font-bold text-leaf-deep tabular-nums">{coin} ⭐</span>
+                  <span className="hidden rounded-full bg-paper px-2.5 py-1 text-ink-soft ring-1 ring-edge tabular-nums sm:inline-block">{packs} {packs === 1 ? "pack" : "packs"}</span>
                   <button
                     onClick={disconnect}
                     title="Disconnect wallet"
-                    className="hidden items-center gap-1 rounded-full px-2 py-1 font-mono text-xs text-ink-soft transition hover:bg-paper hover:text-ink lg:inline-flex"
+                    aria-label={`Disconnect wallet ${short(address)}`}
+                    className="inline-flex items-center gap-1 rounded-full px-2 py-1 font-mono text-xs text-ink-soft transition hover:bg-paper hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-leaf"
                   >
-                    {short(address)} <span aria-hidden>⏻</span>
+                    <span className="hidden lg:inline">{short(address)}</span> <span aria-hidden>⏻</span>
                   </button>
                 </div>
               </>
@@ -89,11 +91,11 @@ export default function App() {
 function Landing({ connect, busy, error }: { connect: () => void; busy?: string; error?: string }) {
   return (
     <section className="mx-auto max-w-xl px-6 py-20 text-center">
-      <div className="mx-auto mb-10 grid h-44 w-36 place-items-center rounded-3xl bg-leaf-deep legendary-foil shadow-xl" style={{ transform: "rotate(-6deg)" }}>
-        <span className="font-display text-2xl font-extrabold tracking-wide text-paper">PACK</span>
+      <div className="mx-auto mb-10 w-fit" style={{ transform: "rotate(-6deg)" }}>
+        <PackArt className="h-44 w-36 rounded-3xl shadow-xl" />
       </div>
       <h1 className="font-display text-4xl font-extrabold leading-tight text-ink sm:text-5xl">Collect the people who build Stellar.</h1>
-      <p className="mx-auto mt-4 max-w-md text-ink-soft">Claim coins, rip open packs of SDF stickers, press your favourites into a soulbound album, and swap your doubles. Live on Stellar testnet.</p>
+      <p className="mx-auto mt-4 max-w-md text-ink-soft">Claim coins, rip open packs of SDF stickers, press your favourites into an album that's yours alone — it can never be traded away — and swap your doubles. Live on Stellar testnet.</p>
       <button onClick={connect} disabled={!!busy} className="mt-8 rounded-full bg-leaf-deep px-7 py-3.5 font-display text-lg font-bold text-paper shadow-md transition hover:bg-leaf focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-leaf disabled:opacity-50">
         {busy ? `${busy}…` : "Connect wallet to start"}
       </button>

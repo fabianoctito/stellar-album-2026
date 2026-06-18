@@ -20,7 +20,7 @@ export default function Collection() {
       {owned.length === 0 ? (
         <div className="rounded-2xl bg-cream px-6 py-12 text-center ring-1 ring-edge">
           <p className="text-ink-soft">Your drawer is empty.</p>
-          <Link to="/" className="mt-3 inline-block rounded-full bg-leaf-deep px-5 py-2 text-sm font-bold text-paper transition hover:bg-leaf">
+          <Link to="/" className="mt-3 inline-block rounded-full bg-leaf-deep px-5 py-2 text-sm font-bold text-paper transition hover:bg-leaf focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-leaf">
             Go rip a pack
           </Link>
         </div>

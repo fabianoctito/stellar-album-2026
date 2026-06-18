@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useStore, type Offer } from "../store";
 import { Page, SectionHead, Toast } from "../components/ui";
+import { Dialog, CloseButton, ConfirmDialog } from "../components/Dialog";
 import { TYPES } from "../lib/catalog";
 import { Sticker } from "../components/Sticker";
 import { stickerName } from "../lib/stickers";
@@ -28,14 +29,18 @@ function OfferCard({
   offer,
   mine,
   canAccept,
+  lastCopy,
   busy,
+  pending,
   onAccept,
   onCancel,
 }: {
   offer: Offer;
   mine: boolean;
   canAccept: boolean;
+  lastCopy: boolean;
   busy: boolean;
+  pending: boolean;
   onAccept: () => void;
   onCancel: () => void;
 }) {
@@ -52,9 +57,9 @@ function OfferCard({
         <button
           onClick={onCancel}
           disabled={busy}
-          className="rounded-full px-4 py-2 text-sm font-bold text-leaf-deep underline-offset-2 transition hover:underline disabled:opacity-40"
+          className="rounded-full px-4 py-2 text-sm font-bold text-leaf-deep underline-offset-2 transition hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-leaf disabled:opacity-40"
         >
-          Take it back
+          {pending ? "Taking it back…" : "Take it back"}
         </button>
       ) : (
         <div className="flex flex-col gap-1">
@@ -63,30 +68,36 @@ function OfferCard({
             disabled={busy || !canAccept}
             className="rounded-full bg-leaf-deep px-4 py-2 text-sm font-bold text-paper transition hover:bg-leaf focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-leaf disabled:opacity-40"
           >
-            Accept — trade your {stickerName(offer.want)}
+            {pending ? "Accepting…" : `Accept — trade your ${stickerName(offer.want)}`}
           </button>
-          {!canAccept && (
+          {!canAccept ? (
             <span className="text-center text-[11px] font-semibold text-ink-soft">
               You need {stickerName(offer.want)} to accept
             </span>
-          )}
+          ) : lastCopy ? (
+            <span className="text-center text-[11px] font-semibold text-ink-soft">
+              Your only {stickerName(offer.want)} — you'll give it away
+            </span>
+          ) : null}
         </div>
       )}
     </div>
   );
 }
 
-// A tappable slot in the "you give ⇄ you want" preview row.
-function Slot({ label, typeId, qty, onClick }: { label: string; typeId?: number; qty?: number; onClick: () => void }) {
+// A tappable slot in the "you give ⇄ you want" preview row. An offer always
+// moves a single sticker, so we never stamp the owned-count badge here (it read
+// as "trade all of them"); ownership is shown as a caption instead.
+function Slot({ label, typeId, owned, onClick }: { label: string; typeId?: number; owned?: number; onClick: () => void }) {
   return (
     <div className="flex flex-1 flex-col items-center gap-2">
       <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">{label}</span>
       <button
         onClick={onClick}
-        className="group relative w-32 rounded-2xl ring-2 ring-transparent transition focus-visible:outline-2 focus-visible:outline-leaf hover:ring-leaf/50 sm:w-36"
+        className="group relative w-full max-w-36 rounded-2xl ring-2 ring-transparent transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-leaf hover:ring-leaf/50"
       >
         {typeId != null ? (
-          <Sticker typeId={typeId} qty={qty} big />
+          <Sticker typeId={typeId} big />
         ) : (
           <span className="grid aspect-[3/4] w-full place-items-center rounded-2xl bg-paper text-sm text-ink-soft ring-1 ring-edge">
             nothing yet
@@ -96,6 +107,9 @@ function Slot({ label, typeId, qty, onClick }: { label: string; typeId?: number;
           Change
         </span>
       </button>
+      {typeId != null && owned != null && owned > 1 && (
+        <span className="text-[11px] text-ink-soft">Trading 1 of {owned} you own</span>
+      )}
     </div>
   );
 }
@@ -119,80 +133,71 @@ function PickerModal({
   onPick: (t: number) => void;
   onClose: () => void;
 }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
+  const titleId = useId();
   return (
-    <motion.div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
-      onClick={onClose}
-    >
-      <div
-        className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-paper p-5 shadow-xl ring-1 ring-edge"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="font-display text-lg font-bold text-ink">{title}</h3>
-          <button onClick={onClose} className="rounded-full px-3 py-1 text-sm font-semibold text-ink-soft transition hover:bg-kraft">
-            Close
-          </button>
-        </div>
-        {items.length === 0 ? (
-          <p className="py-10 text-center text-sm text-ink-soft">
-            You don't have any stickers to give yet — rip open a pack first.
-          </p>
-        ) : (
-          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-            {items.map((t) => {
-              // "Have it" means it's in your drawer OR already pasted in your
-              // album — a pasted sticker is burned from the collection, so it
-              // must still count as owned here, not "missing".
-              const has = (collection[t] ?? 0) > 0 || !!pasted[t];
-              return (
-                <motion.button
-                  key={t}
-                  layout
-                  whileHover={{ y: -4 }}
-                  onClick={() => onPick(t)}
-                  className="flex flex-col gap-1 rounded-2xl text-left focus-visible:outline-2 focus-visible:outline-leaf"
-                >
-                  <Sticker typeId={t} qty={owned ? collection[t] : undefined} />
-                  {!owned && (
-                    <span className={`text-center text-[11px] font-semibold ${has ? "text-leaf-deep" : "text-ink-soft"}`}>
-                      {has ? "✓ you have this" : "missing"}
-                    </span>
-                  )}
-                </motion.button>
-              );
-            })}
-          </div>
-        )}
+    <Dialog onClose={onClose} labelledBy={titleId} panelClassName="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-paper p-5 shadow-xl ring-1 ring-edge">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 id={titleId} className="font-display text-lg font-bold text-ink">{title}</h3>
+        <CloseButton onClick={onClose} className="text-ink-soft hover:bg-kraft" />
       </div>
-    </motion.div>
+      {items.length === 0 ? (
+        <p className="py-10 text-center text-sm text-ink-soft">
+          You don't have any stickers to give yet — rip open a pack first.
+        </p>
+      ) : (
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+          {items.map((t) => {
+            // "Have it" means it's in your drawer OR already pasted in your
+            // album — a pasted sticker is burned from the collection, so it
+            // must still count as owned here, not "missing".
+            const has = (collection[t] ?? 0) > 0 || !!pasted[t];
+            return (
+              <motion.button
+                key={t}
+                layout
+                whileHover={{ y: -4 }}
+                onClick={() => onPick(t)}
+                className="flex flex-col gap-1 rounded-2xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-leaf"
+              >
+                <Sticker typeId={t} qty={owned ? collection[t] : undefined} />
+                {/* In the "want" picker, the sticker you're missing is the one
+                    you'd want — so lead with that, and soft-flag ones you own. */}
+                {!owned && (
+                  <span className={`text-center text-[11px] font-semibold ${has ? "text-ink-soft" : "text-leaf-deep"}`}>
+                    {has ? "you already have this" : "✦ missing — good pick"}
+                  </span>
+                )}
+              </motion.button>
+            );
+          })}
+        </div>
+      )}
+    </Dialog>
   );
 }
 
 export default function Trade() {
-  const { address, collection, pasted, offers, busy, error, createOffer, acceptOffer, cancelOffer, reloadOffers } = useStore();
+  const { address, collection, pasted, offers, busy, error, clearError, createOffer, acceptOffer, cancelOffer, reloadOffers } = useStore();
   const owned = TYPES.filter((t) => (collection[t] ?? 0) > 0);
 
   const [give, setGive] = useState<number | undefined>();
   const [want, setWant] = useState<number | undefined>();
   const [picking, setPicking] = useState<Picking>(null);
   const [created, setCreated] = useState<{ id: string; give: number; want: number }>();
+  const [pendingId, setPendingId] = useState<string | null>(null); // offer being accepted/cancelled
+  const [confirmAccept, setConfirmAccept] = useState<Offer | null>(null);
 
   // Pull the latest open offers when the page opens (others may have posted
   // since connect). Subsequent create/accept/cancel refresh automatically.
   useEffect(() => {
     reloadOffers();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // If our posted offer is filled or cancelled (no longer in the open list),
+  // retire the stale "on the table" confirmation so it can't contradict reality.
+  useEffect(() => {
+    if (created && created.id !== "?" && !offers.some((o) => o.id === created.id)) setCreated(undefined);
+  }, [offers, created]);
 
   // Sensible defaults once the collection loads: give = first owned, want =
   // first type you don't own. Re-correct give if it ever points to a type you
@@ -226,12 +231,23 @@ export default function Trade() {
     if (id) setCreated({ id, give, want });
   };
   const onCancel = async (id: string) => {
+    setPendingId(id);
     await cancelOffer(id);
+    setPendingId(null);
     setCreated(undefined);
+  };
+  const onAccept = async (o: Offer) => {
+    setConfirmAccept(null);
+    setPendingId(o.id);
+    await acceptOffer(o.id);
+    setPendingId(null);
   };
 
   const ready = give != null && want != null && give !== want;
-  const giveItems = owned.filter((t) => t !== want);
+  const isLastCopy = (t: number) => (collection[t] ?? 0) === 1;
+  // Surface the best trade fuel first: most duplicates at the top (stable sort
+  // keeps type-id order within an equal count).
+  const giveItems = owned.filter((t) => t !== want).sort((a, b) => (collection[b] ?? 0) - (collection[a] ?? 0));
   const wantItems = TYPES.filter((t) => t !== give);
 
   return (
@@ -250,30 +266,35 @@ export default function Trade() {
         ) : (
           <>
             <div className="mt-4 flex items-center gap-2 sm:gap-4">
-              <Slot label="You give" typeId={give} qty={give != null ? collection[give] : undefined} onClick={() => setPicking("give")} />
+              <Slot label="You give" typeId={give} owned={give != null ? collection[give] : undefined} onClick={() => setPicking("give")} />
               <span aria-hidden className="mt-6 select-none text-2xl text-ink-soft sm:text-3xl">⇄</span>
               <Slot label="You want" typeId={want} onClick={() => setPicking("want")} />
             </div>
 
-            {give != null && collection[give] === 1 && (
-              <p className="mt-4 rounded-lg bg-paper px-3 py-2 text-xs text-ink-soft ring-1 ring-edge">
-                This is your <b>only copy</b> of {stickerName(give)} — you'll lose it if someone accepts. Duplicates make the safest trade fuel.
+            {give != null && isLastCopy(give) && (
+              <p className="mt-4 flex gap-2 rounded-lg bg-paper px-3 py-2 text-xs text-ink-soft ring-1 ring-edge">
+                <span aria-hidden>⚠️</span>
+                <span>
+                  Your <b>only</b> {stickerName(give)}. Trade it and it's gone — offer a duplicate instead when you have one.
+                </span>
               </p>
             )}
 
-            <button
-              onClick={onCreate}
-              disabled={!!busy || !ready}
-              className="mt-4 rounded-full bg-leaf-deep px-5 py-2.5 font-display text-sm font-bold text-paper transition hover:bg-leaf focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-leaf disabled:opacity-40"
-            >
-              Put it on the table
-            </button>
+            <div className="mt-5 flex justify-center">
+              <button
+                onClick={onCreate}
+                disabled={!!busy || !ready}
+                className="rounded-full bg-leaf-deep px-6 py-2.5 font-display text-sm font-bold text-paper transition hover:bg-leaf focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-leaf disabled:opacity-40"
+              >
+                Put it on the table
+              </button>
+            </div>
           </>
         )}
 
         {created && (
           <div className="mt-5 rounded-xl bg-leaf-tint p-4">
-            <p className="text-sm font-semibold text-leaf-deep">🔒 Offer #{created.id} is on the table</p>
+            <p className="text-sm font-semibold text-leaf-deep">🔒 {created.id !== "?" ? `Offer #${created.id}` : "Your offer"} is on the table</p>
             <div className="mt-3">
               <SwapPair give={created.give} want={created.want} />
             </div>
@@ -317,8 +338,10 @@ export default function Trade() {
                 offer={o}
                 mine={o.maker === address}
                 canAccept={(collection[o.want] ?? 0) > 0}
+                lastCopy={isLastCopy(o.want)}
                 busy={!!busy}
-                onAccept={() => acceptOffer(o.id)}
+                pending={pendingId === o.id}
+                onAccept={() => setConfirmAccept(o)}
                 onCancel={() => onCancel(o.id)}
               />
             ))}
@@ -326,9 +349,29 @@ export default function Trade() {
         )}
       </div>
 
-      <Toast busy={busy} error={error} />
+      <Toast busy={busy} error={error} onDismiss={clearError} />
 
       <AnimatePresence>
+        {confirmAccept && (
+          <ConfirmDialog
+            title={`Trade for ${stickerName(confirmAccept.give)}?`}
+            confirmLabel="Trade"
+            busy={!!busy}
+            onClose={() => setConfirmAccept(null)}
+            onConfirm={() => onAccept(confirmAccept)}
+            body={
+              <>
+                You'll give your <b>{stickerName(confirmAccept.want)}</b> and receive their <b>{stickerName(confirmAccept.give)}</b>. The swap is atomic — both move together.
+                {isLastCopy(confirmAccept.want) && (
+                  <>
+                    {" "}
+                    This is your <b>only copy</b> of {stickerName(confirmAccept.want)}.
+                  </>
+                )}
+              </>
+            }
+          />
+        )}
         {picking === "give" && (
           <PickerModal
             title="Choose what you'll give"
